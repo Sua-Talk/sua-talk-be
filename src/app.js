@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const { connectDB, checkDBHealth } = require('./config/database');
+const { databaseErrorMiddleware } = require('./utils/dbErrorHandler');
 require('dotenv').config();
 
 const app = express();
@@ -28,12 +30,15 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  const dbHealth = await checkDBHealth();
+  
   res.json({
-    status: 'ok',
+    status: dbHealth.state ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env.npm_package_version || '1.0.0',
+    database: dbHealth
   });
 });
 
@@ -46,7 +51,10 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Error handling middleware
+// Database error handling middleware
+app.use(databaseErrorMiddleware);
+
+// General error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -66,10 +74,16 @@ app.use('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  // Initialize database connection before starting server
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    });
+  }).catch((error) => {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   });
 }
 
