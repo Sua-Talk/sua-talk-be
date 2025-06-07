@@ -3,6 +3,11 @@ const path = require('path');
 const fs = require('fs');
 const fileStorageService = require('../services/fileStorage');
 
+// Import storage configuration based on environment
+const storageConfig = process.env.NODE_ENV === 'production' 
+  ? require('../config/storage') // Minio S3 for production
+  : null; // Local storage for development
+
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
 const babyPhotosDir = path.join(uploadsDir, 'baby-photos');
@@ -155,14 +160,18 @@ const avatarUpload = multer({
   }
 });
 
-// Middleware for single photo upload
-const uploadBabyPhoto = photoUpload.single('photo');
+// Middleware for file uploads - use S3 storage in production, local in development
+const uploadBabyPhoto = process.env.NODE_ENV === 'production' 
+  ? storageConfig.uploadBabyPhoto 
+  : photoUpload.single('photo');
 
-// Middleware for single audio upload
-const uploadAudioRecording = audioUpload.single('audio');
+const uploadAudioRecording = process.env.NODE_ENV === 'production'
+  ? storageConfig.uploadAudioRecording
+  : audioUpload.single('audio');
 
-// Middleware for single avatar upload
-const uploadAvatar = avatarUpload.single('avatar');
+const uploadAvatar = process.env.NODE_ENV === 'production'
+  ? storageConfig.uploadAvatar
+  : avatarUpload.single('avatar');
 
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {

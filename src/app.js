@@ -322,6 +322,18 @@ if (require.main === module) {
     await jobManager.initialize();
     await jobManager.scheduleCleanupJob();
     
+    // Initialize Minio storage in production
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        const storageConfig = require('./config/storage');
+        await storageConfig.createBucketIfNotExists();
+        console.log('✅ Minio storage initialized');
+      } catch (error) {
+        console.warn('⚠️ Minio storage initialization failed:', error.message);
+        console.warn('📁 Falling back to local storage for development');
+      }
+    }
+    
     app.listen(PORT, () => {
       console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
