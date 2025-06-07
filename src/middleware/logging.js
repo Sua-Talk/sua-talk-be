@@ -201,6 +201,19 @@ const performanceLogger = (req, res, next) => {
   res.on('finish', () => {
     const responseTime = Date.now() - startTime;
     
+    // Record metrics for alerting system
+    try {
+      const alerting = require('../utils/alerting');
+      alerting.recordResponseTime(responseTime, {
+        url: req.url,
+        method: req.method,
+        userId: req.user ? req.user._id : null
+      });
+    } catch (error) {
+      // Don't let alerting errors affect the main request
+      console.error('Error recording response time for alerting:', error.message);
+    }
+    
     // Log slow requests (> 1 second)
     if (responseTime > 1000) {
       logger.warn('Slow Request', {

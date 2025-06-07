@@ -11,6 +11,7 @@ const userRoutes = require('./routes/userRoutes');
 const babyRoutes = require('./routes/babyRoutes');
 const audioRoutes = require('./routes/audioRoutes');
 const mlRoutes = require('./routes/mlRoutes');
+const monitoringRoutes = require('./routes/monitoringRoutes');
 const { 
   mongoSanitizeMiddleware, 
   securityHeaders, 
@@ -145,17 +146,88 @@ app.use('/uploads',
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
-  const dbHealth = await checkDBHealth();
-  const jobStats = await jobManager.getJobStats();
-  
-  res.json({
-    status: dbHealth.state ? 'ok' : 'degraded',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.npm_package_version || '1.0.0',
-    database: dbHealth,
-    jobs: jobStats
-  });
+  try {
+    const systemMetrics = require('./utils/systemMetrics');
+    const mlService = require('./services/mlService');
+    const alerting = require('./utils/alerting');
+    
+    const [dbHealth, jobStats, systemHealth, mlStatus] = await Promise.allSettled([
+      checkDBHealth(),
+      jobManager.getJobStats(),
+      systemMetrics.getHealthStatus(),
+      mlService.isServiceAvailable()
+    ]);
+
+    // Determine overall status
+    let overallStatus = 'healthy';
+    const issues = [];
+
+    // Check database
+    if (dbHealth.status !== 'fulfilled' || !dbHealth.value.state) {
+      overallStatus = 'degraded';
+      issues.push('Database connectivity issues');
+    }
+
+    // Check system health
+    if (systemHealth.status === 'fulfilled' && systemHealth.value.status !== 'healthy') {
+      if (systemHealth.value.status === 'critical') {
+        overallStatus = 'critical';
+      } else if (overallStatus === 'healthy') {
+        overallStatus = 'degraded';
+      }
+      issues.push(...systemHealth.value.errors, ...systemHealth.value.warnings);
+    }
+
+    // Check ML service
+    if (mlStatus.status !== 'fulfilled' || !mlStatus.value) {
+      if (overallStatus === 'healthy') {
+        overallStatus = 'degraded';
+      }
+      issues.push('ML service unavailable');
+    }
+
+    const healthResponse = {
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      version: process.env.npm_package_version || '1.0.0',
+      uptime: systemHealth.status === 'fulfilled' ? systemHealth.value.metrics?.uptime : null,
+      database: dbHealth.status === 'fulfilled' ? dbHealth.value : { error: dbHealth.reason?.message },
+      jobs: jobStats.status === 'fulfilled' ? jobStats.value : { error: jobStats.reason?.message },
+      mlService: {
+        available: mlStatus.status === 'fulfilled' ? mlStatus.value : false,
+        error: mlStatus.status !== 'fulfilled' ? mlStatus.reason?.message : null
+      },
+      system: systemHealth.status === 'fulfilled' ? {
+        status: systemHealth.value.status,
+        cpu: systemHealth.value.metrics?.cpu,
+        memory: systemHealth.value.metrics?.memory,
+        warnings: systemHealth.value.warnings,
+        errors: systemHealth.value.errors
+      } : { error: systemHealth.reason?.message },
+      alerts: alerting.getAlertStats(),
+      issues: issues.length > 0 ? issues : null
+    };
+
+    // Set appropriate HTTP status code
+    let httpStatus = 200;
+    if (overallStatus === 'degraded') {
+      httpStatus = 200; // Still operational but with issues
+    } else if (overallStatus === 'critical') {
+      httpStatus = 503; // Service unavailable
+    }
+
+    res.status(httpStatus).json(healthResponse);
+
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: 'Failed to perform health check',
+      message: error.message
+    });
+  }
 });
 
 // Setup API Documentation
@@ -174,6 +246,7 @@ app.get('/', (req, res) => {
       babies: '/babies',
       audio: '/audio',
       ml: '/ml',
+      monitoring: '/monitoring',
       documentation: '/api-docs'
     }
   });
@@ -193,6 +266,9 @@ app.use('/audio', audioRoutes);
 
 // ML routes
 app.use('/ml', mlRoutes);
+
+// Monitoring routes
+app.use('/monitoring', monitoringRoutes);
 
 // CORS error handling middleware
 app.use(corsErrorHandler);

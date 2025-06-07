@@ -44,6 +44,20 @@ const handleApplicationError = (error, req, res, next) => {
     timestamp: new Date().toISOString()
   });
 
+  // Record error for alerting system
+  try {
+    const alerting = require('../utils/alerting');
+    alerting.recordError(error, {
+      url: req.url,
+      method: req.method,
+      userId: req.user?.id,
+      statusCode: res.statusCode || 500
+    });
+  } catch (alertError) {
+    // Don't let alerting errors affect the main error handling
+    console.error('Error recording error for alerting:', alertError.message);
+  }
+
   // Default error response
   let statusCode = 500;
   let message = 'Internal server error';

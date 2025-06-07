@@ -172,6 +172,32 @@ class JobManager {
       }
     });
 
+    // System health monitoring job
+    this.agenda.define('system health check', { priority: 'normal' }, async (job) => {
+      try {
+        const systemMetrics = require('../utils/systemMetrics');
+        const alerting = require('../utils/alerting');
+        
+        const healthStatus = await systemMetrics.getHealthStatus();
+        
+        // Check system health and trigger alerts if needed
+        alerting.checkSystemHealth(healthStatus.metrics);
+        
+        // Log system metrics periodically
+        console.log(`📊 System Health Check:`, {
+          status: healthStatus.status,
+          cpu: `${healthStatus.metrics.cpu.usage}%`,
+          memory: `${healthStatus.metrics.memory.system.usagePercent}%`,
+          uptime: healthStatus.metrics.uptime.service.formatted,
+          warnings: healthStatus.warnings.length,
+          errors: healthStatus.errors.length
+        });
+        
+      } catch (error) {
+        console.error('❌ System health check job error:', error);
+      }
+    });
+
     console.log('📋 Job definitions loaded');
   }
 
@@ -225,7 +251,7 @@ class JobManager {
   }
 
   /**
-   * Schedule cleanup jobs to run daily
+   * Schedule cleanup and monitoring jobs
    */
   async scheduleCleanupJob() {
     if (!this.isInitialized) {
@@ -236,9 +262,13 @@ class JobManager {
       // Schedule daily cleanup at 2 AM
       await this.agenda.every('24 hours', 'cleanup failed jobs');
       await this.agenda.every('24 hours', 'cleanup temp files');
-      console.log('🗓️ Daily cleanup jobs scheduled');
+      
+      // Schedule system health monitoring every 5 minutes
+      await this.agenda.every('5 minutes', 'system health check');
+      
+      console.log('🗓️ Scheduled jobs: daily cleanup + system health monitoring (5min)');
     } catch (error) {
-      console.error('❌ Failed to schedule cleanup jobs:', error);
+      console.error('❌ Failed to schedule jobs:', error);
       throw error;
     }
   }
