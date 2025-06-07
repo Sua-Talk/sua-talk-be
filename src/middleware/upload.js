@@ -5,6 +5,7 @@ const fs = require('fs');
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
 const babyPhotosDir = path.join(uploadsDir, 'baby-photos');
+const audioRecordingsDir = path.join(uploadsDir, 'audio-recordings');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -14,8 +15,12 @@ if (!fs.existsSync(babyPhotosDir)) {
   fs.mkdirSync(babyPhotosDir, { recursive: true });
 }
 
-// Configure multer storage
-const storage = multer.diskStorage({
+if (!fs.existsSync(audioRecordingsDir)) {
+  fs.mkdirSync(audioRecordingsDir, { recursive: true });
+}
+
+// Configure multer storage for baby photos
+const photoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, babyPhotosDir);
   },
@@ -29,8 +34,24 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter to allow only images
-const fileFilter = (req, file, cb) => {
+// Configure multer storage for audio recordings
+const audioStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, audioRecordingsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: audio-{userId}-{timestamp}.{extension}
+    const userId = req.user.userId;
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(7);
+    const extension = path.extname(file.originalname).toLowerCase();
+    const filename = `audio-${userId}-${timestamp}-${randomSuffix}${extension}`;
+    cb(null, filename);
+  }
+});
+
+// File filter for images
+const imageFileFilter = (req, file, cb) => {
   // Check if file is an image
   if (file.mimetype.startsWith('image/')) {
     // Allowed image types
@@ -46,26 +67,70 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configure multer
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+// File filter for audio files
+const audioFileFilter = (req, file, cb) => {
+  // Check if file is an audio file
+  if (file.mimetype.startsWith('audio/')) {
+    // Allowed audio types
+    const allowedTypes = [
+      'audio/wav',
+      'audio/mp3', 
+      'audio/mpeg',
+      'audio/m4a',
+      'audio/flac',
+      'audio/wave',
+      'audio/x-wav'
+    ];
+    
+    // Also check by file extension as backup
+    const extension = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = ['.wav', '.mp3', '.m4a', '.flac'];
+    
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid audio file type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);
+    }
+  } else {
+    cb(new Error('Only audio files are allowed.'), false);
+  }
+};
+
+// Configure multer for baby photos
+const photoUpload = multer({
+  storage: photoStorage,
+  fileFilter: imageFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
     files: 1 // Only one file at a time
   }
 });
 
+// Configure multer for audio recordings
+const audioUpload = multer({
+  storage: audioStorage,
+  fileFilter: audioFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit for audio files
+    files: 1 // Only one file at a time
+  }
+});
+
 // Middleware for single photo upload
-const uploadBabyPhoto = upload.single('photo');
+const uploadBabyPhoto = photoUpload.single('photo');
+
+// Middleware for single audio upload
+const uploadAudioRecording = audioUpload.single('audio');
 
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
+      const isAudioUpload = req.route?.path?.includes('audio');
+      const maxSize = isAudioUpload ? '50MB' : '5MB';
       return res.status(400).json({
         success: false,
-        message: 'File too large. Maximum size is 5MB.',
+        message: `File too large. Maximum size is ${maxSize}.`,
         error: 'FILE_TOO_LARGE'
       });
     }
@@ -79,15 +144,20 @@ const handleUploadError = (error, req, res, next) => {
     }
     
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      const isAudioUpload = req.route?.path?.includes('audio');
+      const expectedField = isAudioUpload ? 'audio' : 'photo';
       return res.status(400).json({
         success: false,
-        message: 'Unexpected field name. Use "photo" as the field name.',
+        message: `Unexpected field name. Use "${expectedField}" as the field name.`,
         error: 'UNEXPECTED_FIELD'
       });
     }
   }
   
-  if (error.message.includes('Invalid file type') || error.message.includes('Only image files')) {
+  if (error.message.includes('Invalid file type') || 
+      error.message.includes('Only image files') ||
+      error.message.includes('Only audio files') ||
+      error.message.includes('Invalid audio file type')) {
     return res.status(400).json({
       success: false,
       message: error.message,
@@ -99,9 +169,35 @@ const handleUploadError = (error, req, res, next) => {
   next(error);
 };
 
+// Utility function to generate unique audio filename
+const generateAudioFilename = (userId, originalname) => {
+  const timestamp = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(7);
+  const extension = path.extname(originalname).toLowerCase();
+  return `audio-${userId}-${timestamp}-${randomSuffix}${extension}`;
+};
+
+// Utility function to get file extension from mimetype
+const getExtensionFromMimetype = (mimetype) => {
+  const mimetypeMap = {
+    'audio/wav': '.wav',
+    'audio/wave': '.wav',
+    'audio/x-wav': '.wav',
+    'audio/mp3': '.mp3',
+    'audio/mpeg': '.mp3',
+    'audio/m4a': '.m4a',
+    'audio/flac': '.flac'
+  };
+  return mimetypeMap[mimetype] || '.mp3'; // Default to .mp3
+};
+
 module.exports = {
   uploadBabyPhoto,
+  uploadAudioRecording,
   handleUploadError,
   uploadsDir,
-  babyPhotosDir
+  babyPhotosDir,
+  audioRecordingsDir,
+  generateAudioFilename,
+  getExtensionFromMimetype
 }; 

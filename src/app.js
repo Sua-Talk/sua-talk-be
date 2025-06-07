@@ -10,6 +10,7 @@ const passport = require('./config/passport');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const babyRoutes = require('./routes/babyRoutes');
+const audioRoutes = require('./routes/audioRoutes');
 const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
 require('dotenv').config();
 
@@ -86,6 +87,9 @@ app.use('/api/users', userRoutes);
 
 // Baby routes
 app.use('/api/babies', babyRoutes);
+
+// Audio routes
+app.use('/api/audio', audioRoutes);
 
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
