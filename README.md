@@ -2,6 +2,14 @@
 
 Baby voice and emotion detection application backend service built with Express.js and MongoDB.
 
+## 🌐 API Architecture
+
+- **Production API**: https://api.suatalk.site
+- **Production Frontend**: https://suatalk.site  
+- **Development**: http://localhost:3000
+
+The API uses subdomain-based architecture for better separation and scalability.
+
 ## 🚀 Features
 
 - 🔐 **Authentication & Authorization** - JWT-based auth with email verification
@@ -62,33 +70,46 @@ Copy `.env.example` to `.env` and configure the following variables:
 
 ## 🚦 API Endpoints
 
+### Base URL
+- **Production**: `https://api.suatalk.site`
+- **Development**: `http://localhost:3000`
+
 ### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/verify-email` - Email verification
-- `POST /api/auth/login` - User login
-- `POST /api/auth/refresh-token` - Token refresh
-- `POST /api/auth/forgot-password` - Password reset request
-- `POST /api/auth/reset-password` - Password reset
-- `GET /api/auth/google` - Google OAuth
+- `POST /auth/register` - User registration
+- `POST /auth/verify-email` - Email verification
+- `POST /auth/login` - User login
+- `POST /auth/refresh-token` - Token refresh
+- `POST /auth/forgot-password` - Password reset request
+- `POST /auth/reset-password` - Password reset
+- `GET /auth/google` - Google OAuth
 
 ### User Management
-- `GET /api/users/profile` - Get user profile
-- `PUT /api/users/profile` - Update user profile
-- `POST /api/users/upload-avatar` - Upload profile picture
+- `GET /users/profile` - Get user profile
+- `PUT /users/profile` - Update user profile
+- `POST /users/upload-avatar` - Upload profile picture
 
 ### Baby Profiles
-- `GET /api/babies` - Get all baby profiles
-- `POST /api/babies` - Create baby profile
-- `PUT /api/babies/:id` - Update baby profile
-- `DELETE /api/babies/:id` - Delete baby profile
+- `GET /babies` - Get all baby profiles
+- `POST /babies` - Create baby profile
+- `PUT /babies/:id` - Update baby profile
+- `DELETE /babies/:id` - Delete baby profile
 
 ### Audio Management
-- `POST /api/audio/upload` - Upload audio file
-- `GET /api/audio/recordings` - Get recordings
-- `POST /api/audio/analyze/:id` - Trigger ML analysis
+- `POST /audio/upload` - Upload audio file
+- `GET /audio/recordings` - Get recordings
+- `POST /audio/analyze/:id` - Trigger ML analysis
+
+### Machine Learning
+- `GET /ml/status` - ML service status
+- `GET /ml/classes` - Available emotion classes
+- `POST /ml/analyze/:recordingId` - Trigger ML analysis
+- `GET /ml/analysis/:recordingId` - Get analysis result
+- `GET /ml/history/:userId` - Get analysis history
+- `GET /ml/stats/:userId` - Get analysis statistics
 
 ### System
 - `GET /health` - Health check endpoint
+- `GET /` - API information and available endpoints
 
 ## 🧪 Development
 
@@ -116,12 +137,26 @@ src/
 
 ## 🐳 Deployment
 
-This application is designed to be deployed using CapRover on Digital Ocean:
+### Subdomain Setup
+
+For production deployment with subdomain architecture:
+
+1. **Configure DNS records** for `api.suatalk.site`
+2. **Setup Nginx reverse proxy** for subdomain routing
+3. **Install SSL certificates** for both domains
+4. **Deploy backend** with PM2 clustering
+5. **Configure environment variables** for production
+
+See [docs/SUBDOMAIN_SETUP.md](docs/SUBDOMAIN_SETUP.md) for detailed deployment instructions.
+
+### Traditional Deployment
+
+This application can also be deployed using CapRover, Docker, or any Node.js hosting platform:
 
 1. **Build Docker image**
-2. **Deploy to CapRover**
+2. **Deploy to hosting platform**
 3. **Configure environment variables**
-4. **Setup MongoDB container**
+4. **Setup MongoDB database**
 5. **Configure ML service integration**
 
 ## 📝 License

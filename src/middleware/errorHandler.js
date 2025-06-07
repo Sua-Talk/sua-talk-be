@@ -164,9 +164,13 @@ const handleNotFound = (req, res) => {
     error: 'ROUTE_NOT_FOUND',
     timestamp: new Date().toISOString(),
     availableRoutes: {
-      auth: '/api/auth/*',
-      users: '/api/users/*',
-      babies: '/api/babies/*'
+      root: '/',
+      health: '/health',
+      auth: '/auth/*',
+      users: '/users/*',
+      babies: '/babies/*',
+      audio: '/audio/*',
+      ml: '/ml/*'
     }
   });
 };
