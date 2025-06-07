@@ -59,6 +59,40 @@ function resolveRefs(obj, basePath, visited = new Set()) {
 }
 
 /**
+ * Replace external references with internal component references
+ */
+function replaceExternalRefs(obj) {
+  if (typeof obj !== 'object' || obj === null) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => replaceExternalRefs(item));
+  }
+
+  const result = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (key === '$ref' && typeof value === 'string') {
+      // Replace external response references with internal component references
+      if (value.startsWith('../responses/common.yaml#/')) {
+        const refName = value.split('#/')[1];
+        result[key] = `#/components/responses/${refName}`;
+      } else if (value.startsWith('../schemas/common.yaml#/')) {
+        const refName = value.split('#/')[1];
+        result[key] = `#/components/schemas/${refName}`;
+      } else {
+        result[key] = value;
+      }
+    } else {
+      result[key] = replaceExternalRefs(value);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Bundle the modular OpenAPI specification
  */
 function bundleOpenAPI() {
@@ -91,6 +125,10 @@ function bundleOpenAPI() {
         console.warn(`  ⚠️ Warning: Could not load ${pathFile}: ${error.message}`);
       }
     }
+    
+    // Replace external references in paths with internal component references
+    console.log('🔄 Replacing external references with internal component references...');
+    bundledData.paths = replaceExternalRefs(bundledData.paths);
     
     // Merge schemas
     console.log('📝 Merging schema definitions...');

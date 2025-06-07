@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
@@ -143,6 +144,16 @@ app.use('/uploads',
   secureFileAccess,
   streamFile
 );
+
+// Serve OpenAPI documentation files as static content
+app.use('/docs/api', express.static(path.join(__dirname, '../docs/api'), {
+  // Security options for static files
+  etag: true,
+  lastModified: true,
+  maxAge: '1h', // Cache for 1 hour
+  dotfiles: 'deny',
+  index: false
+}));
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

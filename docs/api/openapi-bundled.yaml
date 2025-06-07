@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-07T16:32:39.072Z*
+    *Last bundled: 2025-06-07T17:02:41.492Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -118,23 +118,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '413':
           description: File too large
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: Unsupported audio format
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /audio/recordings:
     get:
       tags:
@@ -217,7 +217,7 @@ paths:
                     items:
                       $ref: ../schemas/audio.yaml#/AudioRecording
                   pagination:
-                    $ref: ../schemas/common.yaml#/PaginationInfo
+                    $ref: '#/components/schemas/PaginationInfo'
                   filters:
                     type: object
                     properties:
@@ -226,9 +226,9 @@ paths:
                       status:
                         type: string
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /audio/recordings/{id}:
     get:
       tags:
@@ -259,13 +259,13 @@ paths:
                   data:
                     $ref: ../schemas/audio.yaml#/AudioRecordingWithAnalysis
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     delete:
       tags:
         - Audio
@@ -298,13 +298,13 @@ paths:
                     type: string
                     example: Audio recording deleted successfully
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /audio/pending-analysis:
     get:
       tags:
@@ -343,9 +343,9 @@ paths:
                     example: 5
                     description: Number of pending recordings
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /audio/batch-analyze:
     post:
       tags:
@@ -409,11 +409,11 @@ paths:
                         format: date-time
                         example: '2024-01-15T19:00:00.000Z'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /audio/cleanup:
     post:
       tags:
@@ -472,9 +472,9 @@ paths:
                         type: boolean
                         example: false
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/register:
     post:
       tags:
@@ -522,17 +522,17 @@ paths:
                   description: Optional phone number in international format
       responses:
         '201':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '409':
           description: User already exists
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/verify-email:
     post:
       tags:
@@ -566,9 +566,9 @@ paths:
               schema:
                 $ref: ../schemas/user.yaml#/TokenResponse
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/resend-verification:
     post:
       tags:
@@ -591,11 +591,11 @@ paths:
                   example: john.doe@example.com
       responses:
         '200':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/login:
     post:
       tags:
@@ -628,9 +628,9 @@ paths:
               schema:
                 $ref: ../schemas/user.yaml#/TokenResponse
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/refresh-token:
     post:
       tags:
@@ -658,7 +658,7 @@ paths:
               schema:
                 $ref: ../schemas/user.yaml#/TokenResponse
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
   /auth/logout:
     post:
       tags:
@@ -681,11 +681,11 @@ paths:
                   example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
       responses:
         '200':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
   /auth/forgot-password:
     post:
       tags:
@@ -708,11 +708,11 @@ paths:
                   example: john.doe@example.com
       responses:
         '200':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/reset-password:
     post:
       tags:
@@ -740,11 +740,11 @@ paths:
                   example: NewSecurePass123!
       responses:
         '200':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/change-password:
     post:
       tags:
@@ -776,11 +776,11 @@ paths:
                   example: NewSecurePass123!
       responses:
         '200':
-          $ref: ../responses/common.yaml#/SuccessResponse
+          $ref: '#/components/responses/SuccessResponse'
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
   /auth/google:
     get:
       tags:
@@ -800,9 +800,9 @@ paths:
         '302':
           description: Redirect to Google OAuth
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /auth/google/callback:
     get:
       tags:
@@ -827,9 +827,9 @@ paths:
         '302':
           description: Redirect to success page with tokens
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
   /auth/oauth-success:
     get:
       tags:
@@ -913,11 +913,11 @@ paths:
                   data:
                     $ref: ../schemas/baby.yaml#/Baby
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     get:
       tags:
         - Babies
@@ -959,11 +959,11 @@ paths:
                     items:
                       $ref: ../schemas/baby.yaml#/Baby
                   pagination:
-                    $ref: ../schemas/common.yaml#/PaginationInfo
+                    $ref: '#/components/schemas/PaginationInfo'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /babies/{id}:
     get:
       tags:
@@ -994,13 +994,13 @@ paths:
                   data:
                     $ref: ../schemas/baby.yaml#/Baby
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     put:
       tags:
         - Babies
@@ -1069,15 +1069,15 @@ paths:
                   data:
                     $ref: ../schemas/baby.yaml#/Baby
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     delete:
       tags:
         - Babies
@@ -1110,13 +1110,13 @@ paths:
                     type: string
                     example: Baby profile deleted successfully
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /babies/{id}/upload-photo:
     post:
       tags:
@@ -1185,27 +1185,27 @@ paths:
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '413':
           description: File too large
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: Unsupported media type
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /babies/{id}/photo:
     delete:
       tags:
@@ -1237,13 +1237,13 @@ paths:
                     type: string
                     example: Baby photo deleted successfully
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /:
     get:
       summary: API Root
@@ -1401,11 +1401,11 @@ paths:
                   data:
                     $ref: ../schemas/apikey.yaml#/APIKeyWithSecret
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     get:
       tags:
         - API Keys
@@ -1463,11 +1463,11 @@ paths:
                     items:
                       $ref: ../schemas/apikey.yaml#/APIKey
                   pagination:
-                    $ref: ../schemas/common.yaml#/PaginationInfo
+                    $ref: '#/components/schemas/PaginationInfo'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /keys/stats:
     get:
       tags:
@@ -1550,9 +1550,9 @@ paths:
                             requests:
                               type: integer
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /keys/{id}:
     get:
       tags:
@@ -1583,13 +1583,13 @@ paths:
                   data:
                     $ref: ../schemas/apikey.yaml#/APIKeyWithStats
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     put:
       tags:
         - API Keys
@@ -1654,15 +1654,15 @@ paths:
                   data:
                     $ref: ../schemas/apikey.yaml#/APIKey
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     delete:
       tags:
         - API Keys
@@ -1695,13 +1695,13 @@ paths:
                     type: string
                     example: API key deleted successfully
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /keys/{id}/rotate:
     post:
       tags:
@@ -1737,13 +1737,13 @@ paths:
                   data:
                     $ref: ../schemas/apikey.yaml#/APIKeyWithSecret
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /keys/{id}/revoke:
     post:
       tags:
@@ -1791,15 +1791,15 @@ paths:
                   data:
                     $ref: ../schemas/apikey.yaml#/APIKey
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /ml/status:
     get:
       tags:
@@ -1839,7 +1839,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
   /ml/classes:
     get:
       tags:
@@ -1915,13 +1915,13 @@ paths:
                         type: string
                         example: queued
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /ml/analysis/{recordingId}:
     get:
       tags:
@@ -1976,13 +1976,13 @@ paths:
                                 type: number
                                 example: 0.87
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /ml/history/{userId}:
     get:
       tags:
@@ -2034,15 +2034,15 @@ paths:
                         confidence:
                           type: number
                   pagination:
-                    $ref: ../schemas/common.yaml#/PaginationInfo
+                    $ref: '#/components/schemas/PaginationInfo'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /ml/stats/{userId}:
     get:
       tags:
@@ -2089,13 +2089,13 @@ paths:
                                 type: number
                                 example: 40
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          $ref: ../responses/common.yaml#/Forbidden
+          $ref: '#/components/responses/Forbidden'
         '404':
-          $ref: ../responses/common.yaml#/NotFound
+          $ref: '#/components/responses/NotFound'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /users/profile:
     get:
       tags:
@@ -2118,9 +2118,9 @@ paths:
                   data:
                     $ref: ../schemas/user.yaml#/UserProfile
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
     put:
       tags:
         - Users
@@ -2173,11 +2173,11 @@ paths:
                   data:
                     $ref: ../schemas/user.yaml#/UserProfile
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /users/upload-avatar:
     post:
       tags:
@@ -2231,23 +2231,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '413':
           description: File too large
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '415':
           description: Unsupported media type
           content:
             application/json:
               schema:
-                $ref: ../schemas/common.yaml#/ErrorResponse
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
   /users/account:
     delete:
       tags:
@@ -2295,11 +2295,11 @@ paths:
                     type: string
                     example: Account deleted successfully
         '400':
-          $ref: ../responses/common.yaml#/BadRequest
+          $ref: '#/components/responses/BadRequest'
         '401':
-          $ref: ../responses/common.yaml#/Unauthorized
+          $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: ../responses/common.yaml#/TooManyRequests
+          $ref: '#/components/responses/TooManyRequests'
 components:
   securitySchemes:
     bearerAuth:
