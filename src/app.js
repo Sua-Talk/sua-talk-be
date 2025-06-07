@@ -37,6 +37,16 @@ require('dotenv').config();
 
 const app = express();
 
+// Trust proxy configuration for CapRover/nginx reverse proxy
+if (process.env.NODE_ENV === 'production') {
+  // Trust the first proxy (CapRover nginx)
+  app.set('trust proxy', 1);
+  console.log('✅ Trust proxy enabled for production (CapRover)');
+} else {
+  // Trust all proxies in development (less secure but more flexible)
+  app.set('trust proxy', true);
+}
+
 // Request ID for tracing (first middleware)
 app.use(requestIdMiddleware);
 
