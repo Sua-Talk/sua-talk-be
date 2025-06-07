@@ -1,3 +1,23 @@
+SuccessResponse:
+  description: Successful operation
+  content:
+    application/json:
+      schema:
+        type: object
+        properties:
+          success:
+            type: boolean
+            example: true
+          message:
+            type: string
+            example: "Operation completed successfully"
+          data:
+            type: object
+            description: "Response data (structure varies by endpoint)"
+        required:
+          - success
+          - message
+
 BadRequest:
   description: Bad request - validation error
   content:

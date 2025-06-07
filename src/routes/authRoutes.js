@@ -37,7 +37,7 @@ const {
  * @route   POST /api/auth/register
  * @desc    Register a new user
  * @access  Public
- * @body    { email, password, firstName, lastName, phone? }
+ * @body    { email, password, firstName, lastName }
  */
 router.post('/register', registrationRateLimit, validateRegistration, authController.register);
 

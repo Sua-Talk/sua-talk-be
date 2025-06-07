@@ -22,6 +22,30 @@ Error:
             type: string
             example: "Email is required"
 
+ErrorResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    message:
+      type: string
+      example: "An error occurred"
+    error:
+      type: string
+      example: "Validation failed"
+    details:
+      type: array
+      items:
+        type: object
+        properties:
+          field:
+            type: string
+            example: "email"
+          message:
+            type: string
+            example: "Email is required"
+
 Success:
   type: object
   properties:

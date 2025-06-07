@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-07T17:02:41.492Z*
+    *Last bundled: 2025-06-07T17:17:15.573Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -516,10 +516,6 @@ paths:
                   maxLength: 50
                   example: Doe
                   description: User's last name
-                phone:
-                  type: string
-                  example: '+1234567890'
-                  description: Optional phone number in international format
       responses:
         '201':
           $ref: '#/components/responses/SuccessResponse'
@@ -718,7 +714,7 @@ paths:
       tags:
         - Authentication
       summary: Reset password
-      description: Reset password using reset token sent via email.
+      description: Resets the user's password using a valid reset token.
       security: []
       requestBody:
         required: true
@@ -732,25 +728,28 @@ paths:
               properties:
                 token:
                   type: string
-                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                  description: Password reset token from email
+                  example: abcd1234efgh5678ijkl9012mnop3456
+                  description: Password reset token received in email
                 newPassword:
                   type: string
                   minLength: 8
                   example: NewSecurePass123!
+                  description: New password meeting complexity requirements
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/change-password:
-    post:
+    put:
       tags:
         - Authentication
       summary: Change password
-      description: Change password for authenticated user.
+      description: Changes the authenticated user's password.
       security:
         - bearerAuth: []
       requestBody:
@@ -762,18 +761,16 @@ paths:
               required:
                 - currentPassword
                 - newPassword
-                - confirmPassword
               properties:
                 currentPassword:
                   type: string
                   example: CurrentPass123!
+                  description: User's current password
                 newPassword:
                   type: string
                   minLength: 8
                   example: NewSecurePass123!
-                confirmPassword:
-                  type: string
-                  example: NewSecurePass123!
+                  description: New password meeting complexity requirements
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
@@ -781,21 +778,24 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/google:
     get:
       tags:
         - Authentication
       summary: Initiate Google OAuth
-      description: Initiate Google OAuth authentication flow.
+      description: Redirects to Google OAuth for authentication.
       security: []
       parameters:
         - name: redirect
           in: query
-          description: Optional redirect URL after successful authentication
+          description: URL to redirect after successful authentication
           required: false
           schema:
             type: string
-            example: https://app.suatalk.site/dashboard
+            format: uri
+            example: https://myapp.com/dashboard
       responses:
         '302':
           description: Redirect to Google OAuth
@@ -808,7 +808,7 @@ paths:
       tags:
         - Authentication
       summary: Google OAuth callback
-      description: Handle Google OAuth callback after user authorization.
+      description: Handles the callback from Google OAuth.
       security: []
       parameters:
         - name: code
@@ -819,7 +819,7 @@ paths:
             type: string
         - name: state
           in: query
-          description: State parameter for security
+          description: State parameter for CSRF protection
           required: false
           schema:
             type: string
@@ -830,21 +830,6 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-  /auth/oauth-success:
-    get:
-      tags:
-        - Authentication
-      summary: OAuth success page
-      description: OAuth success page for token handling in frontend applications.
-      security: []
-      responses:
-        '200':
-          description: OAuth success page
-          content:
-            text/html:
-              schema:
-                type: string
-                example: <!DOCTYPE html><html>...</html>
   /babies:
     post:
       tags:

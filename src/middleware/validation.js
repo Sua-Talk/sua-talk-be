@@ -27,10 +27,7 @@ const validateRegistration = [
     .matches(/^[a-zA-Z\s]+$/)
     .withMessage('Last name can only contain letters and spaces'),
   
-  body('phone')
-    .optional()
-    .isMobilePhone()
-    .withMessage('Please provide a valid phone number')
+
 ];
 
 // Email Verification Validation

@@ -20,7 +20,7 @@ const register = withErrorHandling(async (req, res) => {
     });
   }
 
-  const { email, password, firstName, lastName, phone } = req.body;
+  const { email, password, firstName, lastName } = req.body;
 
   // Check if user already exists
   const existingUser = await User.findByEmail(email);
@@ -37,7 +37,6 @@ const register = withErrorHandling(async (req, res) => {
     password, // Will be hashed by pre-save hook
     firstName,
     lastName,
-    phone,
     isEmailVerified: false
   });
 

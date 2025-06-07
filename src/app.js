@@ -155,6 +155,26 @@ app.use('/docs/api', express.static(path.join(__dirname, '../docs/api'), {
   index: false
 }));
 
+// Serve schema files directly for OpenAPI references
+app.use('/schemas', express.static(path.join(__dirname, '../docs/api/schemas'), {
+  // Security options for static files
+  etag: true,
+  lastModified: true,
+  maxAge: '1h', // Cache for 1 hour
+  dotfiles: 'deny',
+  index: false
+}));
+
+// Serve response definitions for OpenAPI references
+app.use('/responses', express.static(path.join(__dirname, '../docs/api/responses'), {
+  // Security options for static files
+  etag: true,
+  lastModified: true,
+  maxAge: '1h', // Cache for 1 hour
+  dotfiles: 'deny',
+  index: false
+}));
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
   try {
