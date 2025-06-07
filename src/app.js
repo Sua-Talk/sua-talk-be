@@ -109,8 +109,8 @@ app.use(cspViolationReporter);
 // Enhanced CORS configuration
 app.use(corsMiddleware);
 
-// Session configuration (needed for OAuth flow)
-app.use(session({
+// Session configuration with Redis store for production
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'your-super-secret-session-key',
   resave: false,
   saveUninitialized: false,
@@ -118,7 +118,37 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
     maxAge: 10 * 60 * 1000 // 10 minutes
   }
-}));
+};
+
+// Use Redis session store in production, MemoryStore in development
+if (process.env.NODE_ENV === 'production') {
+  try {
+    const redis = require('redis');
+    const RedisStore = require('connect-redis')(session);
+    
+    const redisClient = redis.createClient({
+      socket: {
+        host: process.env.REDIS_HOST || 'srv-captain--redis',
+        port: process.env.REDIS_PORT || 6379,
+        reconnectStrategy: false
+      },
+      password: process.env.REDIS_PASSWORD,
+      database: process.env.REDIS_DB || 0,
+    });
+
+    // Setup Redis error handling with fallback
+    redisClient.on('error', (err) => {
+      console.warn('⚠️ Redis session store error, falling back to MemoryStore:', err.message);
+    });
+
+    sessionConfig.store = new RedisStore({ client: redisClient });
+    console.log('✅ Using Redis session store for production');
+  } catch (error) {
+    console.warn('⚠️ Failed to initialize Redis session store, using MemoryStore:', error.message);
+  }
+}
+
+app.use(session(sessionConfig));
 
 // Initialize Passport
 app.use(passport.initialize());

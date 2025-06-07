@@ -22,15 +22,23 @@ class JobManager {
     }
 
     try {
+      // MongoDB connection options for Agenda
+      const mongoOptions = {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+      };
+
+      // Add authentication source for production
+      if (process.env.NODE_ENV === 'production') {
+        mongoOptions.authSource = 'admin';
+      }
+
       // Initialize agenda with MongoDB connection
       this.agenda = new Agenda({
         db: {
           address: process.env.MONGODB_URI,
           collection: 'agendaJobs',
-          options: {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-          }
+          options: mongoOptions
         },
         processEvery: '10 seconds', // Check for jobs every 10 seconds
         maxConcurrency: 3, // Maximum 3 concurrent jobs
@@ -340,4 +348,4 @@ class JobManager {
 }
 
 // Export singleton instance
-module.exports = new JobManager(); 
+module.exports = new JobManager();
