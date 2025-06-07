@@ -1,0 +1,294 @@
+/ml/status:
+  get:
+    tags:
+      - ML
+    summary: Get ML service status
+    description: "Check the health and availability of the machine learning service."
+    security: []
+    responses:
+      '200':
+        description: ML service status retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [online, offline, degraded]
+                      example: "online"
+                    version:
+                      type: string
+                      example: "1.2.3"
+                    queueSize:
+                      type: integer
+                      example: 5
+      '503':
+        description: ML service unavailable
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+
+/ml/classes:
+  get:
+    tags:
+      - ML
+    summary: Get cry classification classes
+    description: "Retrieve available baby cry classification classes supported by the ML model."
+    security: []
+    responses:
+      '200':
+        description: Classification classes retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    classes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: "hunger"
+                          name:
+                            type: string
+                            example: "Hunger"
+                          description:
+                            type: string
+                            example: "Baby is crying due to hunger or feeding needs"
+
+/ml/analyze/{recordingId}:
+  post:
+    tags:
+      - ML
+    summary: Trigger ML analysis
+    description: "Trigger machine learning analysis for a specific audio recording."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: recordingId
+        in: path
+        description: "Audio recording ID to analyze"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '202':
+        description: Analysis triggered successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "ML analysis triggered successfully"
+                data:
+                  type: object
+                  properties:
+                    analysisId:
+                      type: string
+                      example: "analysis_abc123"
+                    status:
+                      type: string
+                      example: "queued"
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/ml/analysis/{recordingId}:
+  get:
+    tags:
+      - ML
+    summary: Get ML analysis result
+    description: "Retrieve the machine learning analysis result for a specific recording."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: recordingId
+        in: path
+        description: "Audio recording ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Analysis result retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    recordingId:
+                      type: string
+                      example: "507f1f77bcf86cd799439011"
+                    status:
+                      type: string
+                      enum: [queued, processing, completed, failed]
+                      example: "completed"
+                    result:
+                      type: object
+                      properties:
+                        primaryClassification:
+                          type: object
+                          properties:
+                            class:
+                              type: string
+                              example: "hunger"
+                            confidence:
+                              type: number
+                              example: 0.87
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/ml/history/{userId}:
+  get:
+    tags:
+      - ML
+    summary: Get ML analysis history
+    description: "Retrieve the machine learning analysis history for a specific user."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: userId
+        in: path
+        description: "User ID (must be own ID unless admin)"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+      - name: page
+        in: query
+        description: "Page number for pagination"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+    responses:
+      '200':
+        description: Analysis history retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      analysisId:
+                        type: string
+                      recordingId:
+                        type: string
+                      status:
+                        type: string
+                      primaryClassification:
+                        type: string
+                      confidence:
+                        type: number
+                pagination:
+                  $ref: '../schemas/common.yaml#/PaginationInfo'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/ml/stats/{userId}:
+  get:
+    tags:
+      - ML
+    summary: Get ML analysis statistics
+    description: "Retrieve statistical insights from machine learning analyses for a specific user."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: userId
+        in: path
+        description: "User ID (must be own ID unless admin)"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Analysis statistics retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    totalAnalyses:
+                      type: integer
+                      example: 45
+                    classificationBreakdown:
+                      type: object
+                      properties:
+                        hunger:
+                          type: object
+                          properties:
+                            count:
+                              type: integer
+                              example: 18
+                            percentage:
+                              type: number
+                              example: 40.0
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests' 

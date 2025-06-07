@@ -1,0 +1,364 @@
+/auth/register:
+  post:
+    tags:
+      - Authentication
+    summary: Register a new user
+    description: |
+      Create a new user account. After successful registration, an email verification 
+      code will be sent to the provided email address.
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password, firstName, lastName]
+            properties:
+              email:
+                type: string
+                format: email
+                example: "john.doe@example.com"
+                description: "Valid email address"
+              password:
+                type: string
+                minLength: 8
+                example: "SecurePass123!"
+                description: "Password must contain at least 8 characters with uppercase, lowercase, number, and special character"
+              firstName:
+                type: string
+                maxLength: 50
+                example: "John"
+                description: "User's first name"
+              lastName:
+                type: string
+                maxLength: 50
+                example: "Doe"
+                description: "User's last name"
+              phone:
+                type: string
+                example: "+1234567890"
+                description: "Optional phone number in international format"
+    responses:
+      '201':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '409':
+        description: User already exists
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/verify-email:
+  post:
+    tags:
+      - Authentication
+    summary: Verify user email
+    description: "Verify a user's email address using the code sent during registration."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, code]
+            properties:
+              email:
+                type: string
+                format: email
+                example: "john.doe@example.com"
+              code:
+                type: string
+                example: "123456"
+                description: "6-digit verification code sent to email"
+    responses:
+      '200':
+        description: Email verified successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/user.yaml#/TokenResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/resend-verification:
+  post:
+    tags:
+      - Authentication
+    summary: Resend verification email
+    description: "Resends the email verification code to a user's email address."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+                example: "john.doe@example.com"
+    responses:
+      '200':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/login:
+  post:
+    tags:
+      - Authentication
+    summary: User login
+    description: "Authenticates a user and returns JWT access and refresh tokens."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email, password]
+            properties:
+              email:
+                type: string
+                format: email
+                example: "john.doe@example.com"
+              password:
+                type: string
+                example: "SecurePass123!"
+    responses:
+      '200':
+        description: Login successful
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/user.yaml#/TokenResponse'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/refresh-token:
+  post:
+    tags:
+      - Authentication
+    summary: Refresh access token
+    description: "Issues a new access token using a valid refresh token."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refreshToken]
+            properties:
+              refreshToken:
+                type: string
+                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    responses:
+      '200':
+        description: Token refreshed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/user.yaml#/TokenResponse'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+
+/auth/logout:
+  post:
+    tags:
+      - Authentication
+    summary: User logout
+    description: "Invalidates the user's refresh token, effectively logging them out."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [refreshToken]
+            properties:
+              refreshToken:
+                type: string
+                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    responses:
+      '200':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+
+/auth/forgot-password:
+  post:
+    tags:
+      - Authentication
+    summary: Forgot password
+    description: "Sends a password reset link to the user's email."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [email]
+            properties:
+              email:
+                type: string
+                format: email
+                example: "john.doe@example.com"
+    responses:
+      '200':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/reset-password:
+  post:
+    tags:
+      - Authentication
+    summary: Reset password
+    description: "Reset password using reset token sent via email."
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [token, newPassword]
+            properties:
+              token:
+                type: string
+                example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                description: "Password reset token from email"
+              newPassword:
+                type: string
+                minLength: 8
+                example: "NewSecurePass123!"
+    responses:
+      '200':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/change-password:
+  post:
+    tags:
+      - Authentication
+    summary: Change password
+    description: "Change password for authenticated user."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [currentPassword, newPassword, confirmPassword]
+            properties:
+              currentPassword:
+                type: string
+                example: "CurrentPass123!"
+              newPassword:
+                type: string
+                minLength: 8
+                example: "NewSecurePass123!"
+              confirmPassword:
+                type: string
+                example: "NewSecurePass123!"
+    responses:
+      '200':
+        $ref: '../responses/common.yaml#/SuccessResponse'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+
+/auth/google:
+  get:
+    tags:
+      - Authentication
+    summary: Initiate Google OAuth
+    description: "Initiate Google OAuth authentication flow."
+    security: []
+    parameters:
+      - name: redirect
+        in: query
+        description: "Optional redirect URL after successful authentication"
+        required: false
+        schema:
+          type: string
+          example: "https://app.suatalk.site/dashboard"
+    responses:
+      '302':
+        description: Redirect to Google OAuth
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/auth/google/callback:
+  get:
+    tags:
+      - Authentication
+    summary: Google OAuth callback
+    description: "Handle Google OAuth callback after user authorization."
+    security: []
+    parameters:
+      - name: code
+        in: query
+        description: "Authorization code from Google"
+        required: true
+        schema:
+          type: string
+      - name: state
+        in: query
+        description: "State parameter for security"
+        required: false
+        schema:
+          type: string
+    responses:
+      '302':
+        description: Redirect to success page with tokens
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+
+/auth/oauth-success:
+  get:
+    tags:
+      - Authentication
+    summary: OAuth success page
+    description: "OAuth success page for token handling in frontend applications."
+    security: []
+    responses:
+      '200':
+        description: OAuth success page
+        content:
+          text/html:
+            schema:
+              type: string
+              example: "<!DOCTYPE html><html>...</html>" 

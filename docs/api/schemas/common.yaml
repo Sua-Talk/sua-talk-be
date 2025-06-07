@@ -1,0 +1,111 @@
+Error:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: false
+    message:
+      type: string
+      example: "An error occurred"
+    error:
+      type: string
+      example: "Validation failed"
+    details:
+      type: array
+      items:
+        type: object
+        properties:
+          field:
+            type: string
+            example: "email"
+          message:
+            type: string
+            example: "Email is required"
+
+Success:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    message:
+      type: string
+      example: "Operation completed successfully"
+    data:
+      type: object
+
+ValidationError:
+  type: object
+  properties:
+    error:
+      type: boolean
+      example: true
+    message:
+      type: string
+      example: "Validation failed"
+    errors:
+      type: array
+      items:
+        type: object
+        properties:
+          type:
+            type: string
+            example: "field"
+          value:
+            type: string
+            example: "invalid@"
+          msg:
+            type: string
+            example: "Please enter a valid email address"
+          path:
+            type: string
+            example: "email"
+          location:
+            type: string
+            example: "body"
+
+Pagination:
+  type: object
+  properties:
+    currentPage:
+      type: integer
+      minimum: 1
+      example: 1
+    totalPages:
+      type: integer
+      minimum: 1
+      example: 5
+    totalRecords:
+      type: integer
+      minimum: 0
+      example: 100
+    recordsPerPage:
+      type: integer
+      minimum: 1
+      example: 20
+    hasNextPage:
+      type: boolean
+      example: true
+    hasPrevPage:
+      type: boolean
+      example: false
+
+RateLimitInfo:
+  type: object
+  properties:
+    limit:
+      type: integer
+      example: 100
+      description: "Maximum requests allowed in the time window"
+    remaining:
+      type: integer
+      example: 95
+      description: "Remaining requests in the current time window"
+    reset:
+      type: integer
+      example: 1642248600
+      description: "Unix timestamp when the rate limit resets"
+    retryAfter:
+      type: integer
+      example: 300
+      description: "Seconds to wait before making another request" 

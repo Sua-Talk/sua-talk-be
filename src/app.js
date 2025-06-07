@@ -30,6 +30,7 @@ const {
   logStartup
 } = require('./middleware/logging');
 const jobManager = require('./jobs/jobManager');
+const { setupSwagger, validateSwaggerSpec } = require('./config/swagger');
 require('dotenv').config();
 
 const app = express();
@@ -61,7 +62,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'none'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Swagger UI
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'"],
@@ -157,6 +158,9 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// Setup API Documentation
+setupSwagger(app);
+
 // Basic API root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -169,7 +173,8 @@ app.get('/', (req, res) => {
       users: '/users',
       babies: '/babies',
       audio: '/audio',
-      ml: '/ml'
+      ml: '/ml',
+      documentation: '/api-docs'
     }
   });
 });
@@ -215,7 +220,11 @@ if (require.main === module) {
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/auth`);
+      console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
       console.log(`🤖 Background jobs: enabled`);
+      
+      // Validate Swagger specification
+      validateSwaggerSpec();
       
       // Initialize logging system
       logStartup();

@@ -1,0 +1,99 @@
+BadRequest:
+  description: Bad request - validation error
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/Error'
+      example:
+        success: false
+        message: "Validation failed"
+        error: "Bad Request"
+        details:
+          - field: "email"
+            message: "Email is required"
+
+Unauthorized:
+  description: Unauthorized - authentication required
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/Error'
+      example:
+        success: false
+        message: "Authentication required"
+        error: "Unauthorized"
+
+Forbidden:
+  description: Forbidden - insufficient permissions
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/Error'
+      example:
+        success: false
+        message: "Insufficient permissions"
+        error: "Forbidden"
+
+NotFound:
+  description: Resource not found
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/Error'
+      example:
+        success: false
+        message: "Resource not found"
+        error: "Not Found"
+
+TooManyRequests:
+  description: Too many requests - rate limit exceeded
+  headers:
+    X-RateLimit-Limit:
+      schema:
+        type: integer
+        example: 100
+      description: "Maximum requests allowed in the time window"
+    X-RateLimit-Remaining:
+      schema:
+        type: integer
+        example: 0
+      description: "Remaining requests in the current time window"
+    X-RateLimit-Reset:
+      schema:
+        type: integer
+        example: 1642248600
+      description: "Unix timestamp when the rate limit resets"
+    Retry-After:
+      schema:
+        type: integer
+        example: 300
+      description: "Seconds to wait before making another request"
+  content:
+    application/json:
+      schema:
+        allOf:
+          - $ref: '../schemas/common.yaml#/Error'
+          - type: object
+            properties:
+              rateLimitInfo:
+                $ref: '../schemas/common.yaml#/RateLimitInfo'
+      example:
+        success: false
+        message: "Too many requests from this IP, please try again later."
+        error: "Too Many Requests"
+        rateLimitInfo:
+          limit: 100
+          remaining: 0
+          reset: 1642248600
+          retryAfter: 300
+
+InternalServerError:
+  description: Internal server error
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/common.yaml#/Error'
+      example:
+        success: false
+        message: "Internal server error"
+        error: "Internal Server Error" 

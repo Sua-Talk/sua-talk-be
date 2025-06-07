@@ -1,0 +1,84 @@
+openapi: 3.0.3
+info:
+  title: SuaTalk API
+  description: |
+    API for SuaTalk - a baby cry analysis application.
+    
+    ## Authentication
+    Most endpoints require authentication via JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+    
+    ## Rate Limiting  
+    API requests are rate limited. Check response headers for current limits:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Remaining requests  
+    - `X-RateLimit-Reset`: When limit resets (Unix timestamp)
+    
+    ## Error Handling
+    All errors follow a consistent format with HTTP status codes and JSON response bodies containing error details.
+  version: 1.0.0
+  contact:
+    name: SuaTalk API Support
+    email: support@suatalk.site
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.suatalk.site
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+
+tags:
+  - name: General
+    description: General API endpoints
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User profile management
+  - name: Babies
+    description: Baby profile management
+  - name: Audio
+    description: Audio recording management and processing
+  - name: ML
+    description: Machine learning analysis endpoints
+  - name: API Keys
+    description: API key management
+
+paths:
+  # Paths will be automatically merged from individual files by bundling script:
+  # - ./paths/general.yaml (Health check, API info)
+  # - ./paths/auth.yaml (Authentication and OAuth)  
+  # - ./paths/users.yaml (User profile management)
+  # - ./paths/babies.yaml (Baby profile management)
+  # - ./paths/audio.yaml (Audio upload and processing)
+  # - ./paths/ml.yaml (Machine learning analysis)
+  # - ./paths/keys.yaml (API key management)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+  
+  schemas:
+    # Schemas will be merged automatically by the bundling script
+    # Individual schema files:
+    # - ./schemas/common.yaml
+    # - ./schemas/user.yaml
+    # - ./schemas/baby.yaml
+    # - ./schemas/audio.yaml
+    # - ./schemas/apikey.yaml
+  
+  responses:
+    # Responses will be merged automatically by the bundling script
+    # Individual response files:
+    # - ./responses/common.yaml
+
+security:
+  - bearerAuth: [] 

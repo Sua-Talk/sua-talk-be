@@ -1,0 +1,219 @@
+AudioRecording:
+  type: object
+  properties:
+    id:
+      type: string
+      example: "507f1f77bcf86cd799439011"
+      description: "Unique recording ID"
+    title:
+      type: string
+      example: "Evening cry session"
+      description: "Title for the recording"
+    babyId:
+      type: string
+      example: "507f1f77bcf86cd799439010"
+      description: "ID of the baby this recording belongs to"
+    userId:
+      type: string
+      example: "507f1f77bcf86cd799439009"
+      description: "ID of the user who uploaded the recording"
+    fileName:
+      type: string
+      example: "recording_20240115_183000.wav"
+      description: "Original filename"
+    fileUrl:
+      type: string
+      example: "https://api.suatalk.site/uploads/audio/recording123.wav"
+      description: "URL to the audio file"
+    fileSize:
+      type: integer
+      example: 2048576
+      description: "File size in bytes"
+    duration:
+      type: number
+      format: float
+      example: 45.2
+      description: "Duration in seconds"
+    format:
+      type: string
+      enum: [wav, mp3, m4a, flac]
+      example: "wav"
+      description: "Audio file format"
+    sampleRate:
+      type: integer
+      example: 44100
+      description: "Audio sample rate in Hz"
+    bitRate:
+      type: integer
+      example: 320000
+      description: "Audio bit rate in bps"
+    channels:
+      type: integer
+      example: 1
+      description: "Number of audio channels (1=mono, 2=stereo)"
+    notes:
+      type: string
+      example: "Baby was crying before bedtime, seemed tired"
+      description: "User notes about the recording context"
+    recordingDate:
+      type: string
+      format: date-time
+      example: "2024-01-15T18:30:00.000Z"
+      description: "When the recording was made"
+    uploadedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T18:35:00.000Z"
+      description: "When the file was uploaded"
+    analysisStatus:
+      type: string
+      enum: [pending, processing, completed, failed]
+      example: "completed"
+      description: "ML analysis status"
+    analysisStartedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T18:36:00.000Z"
+      description: "When analysis was started"
+    analysisCompletedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T18:36:45.000Z"
+      description: "When analysis was completed"
+    isDeleted:
+      type: boolean
+      example: false
+      description: "Soft delete flag"
+
+AudioRecordingWithAnalysis:
+  allOf:
+    - $ref: '#/AudioRecording'
+    - type: object
+      properties:
+        analysis:
+          type: object
+          properties:
+            id:
+              type: string
+              example: "analysis_abc123"
+            primaryClassification:
+              type: object
+              properties:
+                class:
+                  type: string
+                  example: "hunger"
+                confidence:
+                  type: number
+                  example: 0.87
+                name:
+                  type: string
+                  example: "Hunger"
+            allClassifications:
+              type: array
+              items:
+                type: object
+                properties:
+                  class:
+                    type: string
+                  confidence:
+                    type: number
+                  name:
+                    type: string
+              example:
+                - class: "hunger"
+                  confidence: 0.87
+                  name: "Hunger"
+                - class: "discomfort"
+                  confidence: 0.12
+                  name: "Discomfort"
+            audioFeatures:
+              type: object
+              properties:
+                averageIntensity:
+                  type: number
+                  example: 0.68
+                peakFrequency:
+                  type: number
+                  example: 312.4
+                spectralCentroid:
+                  type: number
+                  example: 1250.5
+            modelVersion:
+              type: string
+              example: "v2.1.0"
+            processingTime:
+              type: number
+              example: 12.3
+              description: "Processing time in seconds"
+
+MLAnalysisResult:
+  type: object
+  properties:
+    prediction:
+      type: string
+      enum: [burping, discomfort, belly_pain, hungry, tired]
+      example: "hungry"
+      nullable: true
+    confidence:
+      type: number
+      minimum: 0
+      maximum: 1
+      example: 0.85
+      nullable: true
+    allPredictions:
+      type: object
+      additionalProperties:
+        type: number
+        minimum: 0
+        maximum: 1
+      example:
+        burping: 0.05
+        discomfort: 0.08
+        belly_pain: 0.02
+        hungry: 0.85
+        tired: 0.00
+      nullable: true
+    modelVersion:
+      type: string
+      example: "1.0.0"
+    processingTime:
+      type: number
+      example: 1234
+      description: "Processing time in milliseconds"
+    analyzedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+      nullable: true
+    error:
+      type: string
+      example: "Audio quality too low for analysis"
+      nullable: true
+
+MLServiceStatus:
+  type: object
+  properties:
+    status:
+      type: string
+      enum: [healthy, degraded, unhealthy]
+      example: "healthy"
+    version:
+      type: string
+      example: "1.0.0"
+    uptime:
+      type: number
+      example: 86400
+      description: "Service uptime in seconds"
+    modelsLoaded:
+      type: array
+      items:
+        type: string
+      example: ["cry_classifier_v1", "emotion_detector_v2"]
+    lastHealthCheck:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    responseTime:
+      type: number
+      example: 150
+      description: "Average response time in milliseconds" 

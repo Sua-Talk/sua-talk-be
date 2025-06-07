@@ -1,0 +1,3033 @@
+openapi: 3.0.3
+info:
+  title: SuaTalk API
+  description: |-
+    API for SuaTalk - a baby cry analysis application.
+
+    ## Authentication
+    Most endpoints require authentication via JWT token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting  
+    API requests are rate limited. Check response headers for current limits:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Remaining requests  
+    - `X-RateLimit-Reset`: When limit resets (Unix timestamp)
+
+    ## Error Handling
+    All errors follow a consistent format with HTTP status codes and JSON response bodies containing error details.
+
+
+    ---
+    *This documentation was automatically generated from modular OpenAPI files.*
+    *Last bundled: 2025-06-07T16:32:39.072Z*
+  version: 1.0.0
+  contact:
+    name: SuaTalk API Support
+    email: support@suatalk.site
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://api.suatalk.site
+    description: Production server
+  - url: http://localhost:3000
+    description: Development server
+tags:
+  - name: General
+    description: General API endpoints
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User profile management
+  - name: Babies
+    description: Baby profile management
+  - name: Audio
+    description: Audio recording management and processing
+  - name: ML
+    description: Machine learning analysis endpoints
+  - name: API Keys
+    description: API key management
+paths:
+  /audio/upload:
+    post:
+      tags:
+        - Audio
+      summary: Upload audio recording
+      description: |
+        Upload an audio recording for baby cry analysis. The audio file will be 
+        processed for machine learning analysis automatically.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+                - babyId
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio file (WAV, MP3, M4A, max 50MB, max 5 minutes)
+                babyId:
+                  type: string
+                  example: 507f1f77bcf86cd799439011
+                  description: ID of the baby this recording belongs to
+                title:
+                  type: string
+                  maxLength: 100
+                  example: Evening cry session
+                  description: Optional title for the recording
+                notes:
+                  type: string
+                  maxLength: 500
+                  example: Baby was crying before bedtime, seemed tired
+                  description: Optional notes about the recording context
+                recordingDate:
+                  type: string
+                  format: date-time
+                  example: '2024-01-15T18:30:00.000Z'
+                  description: When the recording was made (defaults to upload time)
+            encoding:
+              audio:
+                contentType: audio/wav, audio/mpeg, audio/mp4
+      responses:
+        '201':
+          description: Audio uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Audio recording uploaded successfully
+                  data:
+                    $ref: ../schemas/audio.yaml#/AudioRecording
+        '400':
+          description: Invalid file format or size
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '415':
+          description: Unsupported audio format
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /audio/recordings:
+    get:
+      tags:
+        - Audio
+      summary: Get all audio recordings
+      description: Retrieve all audio recordings for the authenticated user with optional filtering.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: babyId
+          in: query
+          description: Filter recordings by baby ID
+          required: false
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+        - name: status
+          in: query
+          description: Filter by analysis status
+          required: false
+          schema:
+            type: string
+            enum:
+              - pending
+              - processing
+              - completed
+              - failed
+            example: completed
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of recordings per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: sortBy
+          in: query
+          description: Sort recordings by field
+          required: false
+          schema:
+            type: string
+            enum:
+              - uploadedAt
+              - recordingDate
+              - title
+            default: uploadedAt
+        - name: sortOrder
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        '200':
+          description: Audio recordings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/audio.yaml#/AudioRecording
+                  pagination:
+                    $ref: ../schemas/common.yaml#/PaginationInfo
+                  filters:
+                    type: object
+                    properties:
+                      babyId:
+                        type: string
+                      status:
+                        type: string
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /audio/recordings/{id}:
+    get:
+      tags:
+        - Audio
+      summary: Get audio recording by ID
+      description: Retrieve a specific audio recording with analysis results.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Audio recording ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Audio recording retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../schemas/audio.yaml#/AudioRecordingWithAnalysis
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    delete:
+      tags:
+        - Audio
+      summary: Delete audio recording
+      description: |
+        Permanently delete an audio recording and its associated analysis data.
+        This action cannot be undone.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Audio recording ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Audio recording deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Audio recording deleted successfully
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /audio/pending-analysis:
+    get:
+      tags:
+        - Audio
+      summary: Get pending analysis recordings
+      description: Retrieve audio recordings that are pending ML analysis for the user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of pending recordings to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Pending recordings retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/audio.yaml#/AudioRecording
+                  count:
+                    type: integer
+                    example: 5
+                    description: Number of pending recordings
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /audio/batch-analyze:
+    post:
+      tags:
+        - Audio
+      summary: Trigger batch ML analysis
+      description: |
+        Trigger ML analysis for multiple recordings or all pending recordings.
+        Analysis will be performed asynchronously in the background.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                recordingIds:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: string
+                  example:
+                    - 507f1f77bcf86cd799439011
+                    - 507f1f77bcf86cd799439012
+                  description: Array of recording IDs to analyze (max 20)
+                analyzeAllPending:
+                  type: boolean
+                  example: false
+                  description: Set to true to analyze all pending recordings
+              oneOf:
+                - required:
+                    - recordingIds
+                - required:
+                    - analyzeAllPending
+      responses:
+        '202':
+          description: Batch analysis triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Batch analysis triggered for 5 recordings
+                  data:
+                    type: object
+                    properties:
+                      jobId:
+                        type: string
+                        example: batch_analysis_abc123
+                      recordingCount:
+                        type: integer
+                        example: 5
+                      estimatedCompletionTime:
+                        type: string
+                        format: date-time
+                        example: '2024-01-15T19:00:00.000Z'
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /audio/cleanup:
+    post:
+      tags:
+        - Audio
+      summary: Cleanup orphaned audio files
+      description: |
+        Maintenance endpoint to cleanup orphaned audio files that exist in storage 
+        but have no corresponding database records.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dryRun:
+                  type: boolean
+                  default: true
+                  example: true
+                  description: If true, only reports what would be cleaned without deleting
+                olderThanDays:
+                  type: integer
+                  minimum: 1
+                  default: 7
+                  example: 30
+                  description: Only cleanup files older than this many days
+      responses:
+        '200':
+          description: Cleanup operation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cleanup completed
+                  data:
+                    type: object
+                    properties:
+                      filesFound:
+                        type: integer
+                        example: 12
+                      filesDeleted:
+                        type: integer
+                        example: 8
+                      spaceSaved:
+                        type: string
+                        example: 145.2 MB
+                      dryRun:
+                        type: boolean
+                        example: false
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: |
+        Create a new user account. After successful registration, an email verification 
+        code will be sent to the provided email address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - firstName
+                - lastName
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                  description: Valid email address
+                password:
+                  type: string
+                  minLength: 8
+                  example: SecurePass123!
+                  description: Password must contain at least 8 characters with uppercase, lowercase, number, and special character
+                firstName:
+                  type: string
+                  maxLength: 50
+                  example: John
+                  description: User's first name
+                lastName:
+                  type: string
+                  maxLength: 50
+                  example: Doe
+                  description: User's last name
+                phone:
+                  type: string
+                  example: '+1234567890'
+                  description: Optional phone number in international format
+      responses:
+        '201':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify user email
+      description: Verify a user's email address using the code sent during registration.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                code:
+                  type: string
+                  example: '123456'
+                  description: 6-digit verification code sent to email
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/user.yaml#/TokenResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/resend-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend verification email
+      description: Resends the email verification code to a user's email address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+      responses:
+        '200':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticates a user and returns JWT access and refresh tokens.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                password:
+                  type: string
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/user.yaml#/TokenResponse
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Issues a new access token using a valid refresh token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/user.yaml#/TokenResponse
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Invalidates the user's refresh token, effectively logging them out.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      responses:
+        '200':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+  /auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Forgot password
+      description: Sends a password reset link to the user's email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+      responses:
+        '200':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: Reset password using reset token sent via email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - newPassword
+              properties:
+                token:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  description: Password reset token from email
+                newPassword:
+                  type: string
+                  minLength: 8
+                  example: NewSecurePass123!
+      responses:
+        '200':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change password
+      description: Change password for authenticated user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+                - confirmPassword
+              properties:
+                currentPassword:
+                  type: string
+                  example: CurrentPass123!
+                newPassword:
+                  type: string
+                  minLength: 8
+                  example: NewSecurePass123!
+                confirmPassword:
+                  type: string
+                  example: NewSecurePass123!
+      responses:
+        '200':
+          $ref: ../responses/common.yaml#/SuccessResponse
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+  /auth/google:
+    get:
+      tags:
+        - Authentication
+      summary: Initiate Google OAuth
+      description: Initiate Google OAuth authentication flow.
+      security: []
+      parameters:
+        - name: redirect
+          in: query
+          description: Optional redirect URL after successful authentication
+          required: false
+          schema:
+            type: string
+            example: https://app.suatalk.site/dashboard
+      responses:
+        '302':
+          description: Redirect to Google OAuth
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /auth/google/callback:
+    get:
+      tags:
+        - Authentication
+      summary: Google OAuth callback
+      description: Handle Google OAuth callback after user authorization.
+      security: []
+      parameters:
+        - name: code
+          in: query
+          description: Authorization code from Google
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          description: State parameter for security
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to success page with tokens
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+  /auth/oauth-success:
+    get:
+      tags:
+        - Authentication
+      summary: OAuth success page
+      description: OAuth success page for token handling in frontend applications.
+      security: []
+      responses:
+        '200':
+          description: OAuth success page
+          content:
+            text/html:
+              schema:
+                type: string
+                example: <!DOCTYPE html><html>...</html>
+  /babies:
+    post:
+      tags:
+        - Babies
+      summary: Create new baby profile
+      description: Create a new baby profile for the current user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - dateOfBirth
+                - gender
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Emma Johnson
+                  description: Baby's full name
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: '2024-01-15'
+                  description: Baby's date of birth
+                gender:
+                  type: string
+                  enum:
+                    - male
+                    - female
+                    - other
+                  example: female
+                weight:
+                  type: number
+                  format: float
+                  example: 3.5
+                  description: Birth weight in kilograms
+                height:
+                  type: number
+                  format: float
+                  example: 50.5
+                  description: Birth height in centimeters
+                notes:
+                  type: string
+                  maxLength: 500
+                  example: Born at 3:45 AM, healthy baby
+                  description: Additional notes about the baby
+      responses:
+        '201':
+          description: Baby profile created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Baby profile created successfully
+                  data:
+                    $ref: ../schemas/baby.yaml#/Baby
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    get:
+      tags:
+        - Babies
+      summary: Get all baby profiles
+      description: Retrieve all baby profiles for the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of babies per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        '200':
+          description: Baby profiles retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/baby.yaml#/Baby
+                  pagination:
+                    $ref: ../schemas/common.yaml#/PaginationInfo
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /babies/{id}:
+    get:
+      tags:
+        - Babies
+      summary: Get baby profile by ID
+      description: Retrieve a specific baby profile by its ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Baby profile ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Baby profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../schemas/baby.yaml#/Baby
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    put:
+      tags:
+        - Babies
+      summary: Update baby profile
+      description: Update an existing baby profile.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Baby profile ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Emma Johnson
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: '2024-01-15'
+                gender:
+                  type: string
+                  enum:
+                    - male
+                    - female
+                    - other
+                  example: female
+                weight:
+                  type: number
+                  format: float
+                  example: 4.2
+                  description: Current weight in kilograms
+                height:
+                  type: number
+                  format: float
+                  example: 55
+                  description: Current height in centimeters
+                notes:
+                  type: string
+                  maxLength: 500
+                  example: Growing well, very active baby
+      responses:
+        '200':
+          description: Baby profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Baby profile updated successfully
+                  data:
+                    $ref: ../schemas/baby.yaml#/Baby
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    delete:
+      tags:
+        - Babies
+      summary: Delete baby profile
+      description: |
+        Soft delete a baby profile. The profile will be marked as deleted 
+        but retained in the system for data integrity.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Baby profile ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Baby profile deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Baby profile deleted successfully
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /babies/{id}/upload-photo:
+    post:
+      tags:
+        - Babies
+      summary: Upload baby photo
+      description: Upload a photo for a specific baby profile.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Baby profile ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - photo
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: Baby photo (JPEG, PNG, WebP, max 10MB)
+                caption:
+                  type: string
+                  maxLength: 200
+                  description: Optional photo caption
+            encoding:
+              photo:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '200':
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Photo uploaded successfully
+                  data:
+                    type: object
+                    properties:
+                      photoUrl:
+                        type: string
+                        example: https://api.suatalk.site/uploads/babies/baby123_photo.jpg
+                      uploadedAt:
+                        type: string
+                        format: date-time
+                        example: '2024-01-15T10:30:00.000Z'
+                      caption:
+                        type: string
+                        example: Emma's first smile
+        '400':
+          description: Invalid file or file too large
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /babies/{id}/photo:
+    delete:
+      tags:
+        - Babies
+      summary: Delete baby photo
+      description: Delete the photo associated with a baby profile.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Baby profile ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Photo deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Baby photo deleted successfully
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /:
+    get:
+      summary: API Root
+      description: Returns basic API information and available endpoints
+      tags:
+        - General
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: SuaTalk Backend API
+                  version:
+                    type: string
+                    example: 1.0.0
+                  status:
+                    type: string
+                    example: running
+                  endpoints:
+                    type: object
+                    properties:
+                      health:
+                        type: string
+                        example: /health
+                      auth:
+                        type: string
+                        example: /auth
+                      users:
+                        type: string
+                        example: /users
+                      babies:
+                        type: string
+                        example: /babies
+                      audio:
+                        type: string
+                        example: /audio
+                      ml:
+                        type: string
+                        example: /ml
+  /health:
+    get:
+      summary: Health Check
+      description: Returns the health status of the API and its dependencies
+      tags:
+        - General
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                      - degraded
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2024-01-15T10:30:00.000Z'
+                  environment:
+                    type: string
+                    example: production
+                  version:
+                    type: string
+                    example: 1.0.0
+                  database:
+                    type: object
+                    properties:
+                      state:
+                        type: boolean
+                        example: true
+                      message:
+                        type: string
+                        example: Connected
+                  jobs:
+                    type: object
+                    properties:
+                      active:
+                        type: integer
+                        example: 0
+                      completed:
+                        type: integer
+                        example: 150
+                      failed:
+                        type: integer
+                        example: 2
+  /keys:
+    post:
+      tags:
+        - API Keys
+      summary: Create new API key
+      description: Create a new API key for programmatic access to the SuaTalk API.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Mobile App Integration
+                  description: Descriptive name for the API key
+                description:
+                  type: string
+                  maxLength: 500
+                  example: API key for mobile application authentication
+                  description: Optional description of the API key purpose
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - read
+                      - write
+                      - delete
+                      - admin
+                  example:
+                    - read
+                    - write
+                  description: Permissions granted to this API key
+                expiresAt:
+                  type: string
+                  format: date-time
+                  example: '2025-01-15T10:30:00.000Z'
+                  description: Optional expiration date for the API key
+      responses:
+        '201':
+          description: API key created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API key created successfully
+                  data:
+                    $ref: ../schemas/apikey.yaml#/APIKeyWithSecret
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    get:
+      tags:
+        - API Keys
+      summary: List API keys
+      description: Retrieve all API keys for the authenticated user. Admins can see all keys.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of keys per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          description: Filter by API key status
+          required: false
+          schema:
+            type: string
+            enum:
+              - active
+              - revoked
+              - expired
+        - name: userId
+          in: query
+          description: Filter by user ID (admin only)
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API keys retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: ../schemas/apikey.yaml#/APIKey
+                  pagination:
+                    $ref: ../schemas/common.yaml#/PaginationInfo
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /keys/stats:
+    get:
+      tags:
+        - API Keys
+      summary: Get API key usage statistics
+      description: Retrieve usage statistics for API keys owned by the authenticated user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          description: Time period for statistics
+          required: false
+          schema:
+            type: string
+            enum:
+              - today
+              - week
+              - month
+              - quarter
+              - year
+            default: month
+        - name: keyId
+          in: query
+          description: Get stats for specific API key
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: API key statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      period:
+                        type: string
+                        example: month
+                      totalRequests:
+                        type: integer
+                        example: 1250
+                      successfulRequests:
+                        type: integer
+                        example: 1180
+                      failedRequests:
+                        type: integer
+                        example: 70
+                      rateLimitedRequests:
+                        type: integer
+                        example: 25
+                      averageResponseTime:
+                        type: number
+                        example: 245.5
+                      topEndpoints:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            endpoint:
+                              type: string
+                              example: /api/audio/upload
+                            requests:
+                              type: integer
+                              example: 450
+                      dailyUsage:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                            requests:
+                              type: integer
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /keys/{id}:
+    get:
+      tags:
+        - API Keys
+      summary: Get API key details
+      description: Retrieve details for a specific API key by its ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: API key ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: API key details retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../schemas/apikey.yaml#/APIKeyWithStats
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    put:
+      tags:
+        - API Keys
+      summary: Update API key
+      description: Update properties of an existing API key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: API key ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                  example: Updated Mobile App Key
+                description:
+                  type: string
+                  maxLength: 500
+                  example: Updated description for mobile app integration
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                      - read
+                      - write
+                      - delete
+                      - admin
+                  example:
+                    - read
+                    - write
+                    - delete
+                expiresAt:
+                  type: string
+                  format: date-time
+                  example: '2025-06-15T10:30:00.000Z'
+      responses:
+        '200':
+          description: API key updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API key updated successfully
+                  data:
+                    $ref: ../schemas/apikey.yaml#/APIKey
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    delete:
+      tags:
+        - API Keys
+      summary: Delete API key
+      description: |
+        Permanently delete an API key. This action cannot be undone and will 
+        immediately invalidate the key.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: API key ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: API key deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API key deleted successfully
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /keys/{id}/rotate:
+    post:
+      tags:
+        - API Keys
+      summary: Rotate API key
+      description: |
+        Generate a new secret for an existing API key. The old secret will be 
+        immediately invalidated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: API key ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: API key rotated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API key rotated successfully
+                  data:
+                    $ref: ../schemas/apikey.yaml#/APIKeyWithSecret
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /keys/{id}/revoke:
+    post:
+      tags:
+        - API Keys
+      summary: Revoke API key
+      description: |
+        Revoke (deactivate) an API key without deleting it. The key can be 
+        reactivated later if needed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: API key ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 200
+                  example: Suspected compromise
+                  description: Optional reason for revocation
+      responses:
+        '200':
+          description: API key revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API key revoked successfully
+                  data:
+                    $ref: ../schemas/apikey.yaml#/APIKey
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /ml/status:
+    get:
+      tags:
+        - ML
+      summary: Get ML service status
+      description: Check the health and availability of the machine learning service.
+      security: []
+      responses:
+        '200':
+          description: ML service status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - online
+                          - offline
+                          - degraded
+                        example: online
+                      version:
+                        type: string
+                        example: 1.2.3
+                      queueSize:
+                        type: integer
+                        example: 5
+        '503':
+          description: ML service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+  /ml/classes:
+    get:
+      tags:
+        - ML
+      summary: Get cry classification classes
+      description: Retrieve available baby cry classification classes supported by the ML model.
+      security: []
+      responses:
+        '200':
+          description: Classification classes retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      classes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: hunger
+                            name:
+                              type: string
+                              example: Hunger
+                            description:
+                              type: string
+                              example: Baby is crying due to hunger or feeding needs
+  /ml/analyze/{recordingId}:
+    post:
+      tags:
+        - ML
+      summary: Trigger ML analysis
+      description: Trigger machine learning analysis for a specific audio recording.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recordingId
+          in: path
+          description: Audio recording ID to analyze
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '202':
+          description: Analysis triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: ML analysis triggered successfully
+                  data:
+                    type: object
+                    properties:
+                      analysisId:
+                        type: string
+                        example: analysis_abc123
+                      status:
+                        type: string
+                        example: queued
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /ml/analysis/{recordingId}:
+    get:
+      tags:
+        - ML
+      summary: Get ML analysis result
+      description: Retrieve the machine learning analysis result for a specific recording.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: recordingId
+          in: path
+          description: Audio recording ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Analysis result retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      recordingId:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
+                      status:
+                        type: string
+                        enum:
+                          - queued
+                          - processing
+                          - completed
+                          - failed
+                        example: completed
+                      result:
+                        type: object
+                        properties:
+                          primaryClassification:
+                            type: object
+                            properties:
+                              class:
+                                type: string
+                                example: hunger
+                              confidence:
+                                type: number
+                                example: 0.87
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /ml/history/{userId}:
+    get:
+      tags:
+        - ML
+      summary: Get ML analysis history
+      description: Retrieve the machine learning analysis history for a specific user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          description: User ID (must be own ID unless admin)
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+        - name: page
+          in: query
+          description: Page number for pagination
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Analysis history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        analysisId:
+                          type: string
+                        recordingId:
+                          type: string
+                        status:
+                          type: string
+                        primaryClassification:
+                          type: string
+                        confidence:
+                          type: number
+                  pagination:
+                    $ref: ../schemas/common.yaml#/PaginationInfo
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /ml/stats/{userId}:
+    get:
+      tags:
+        - ML
+      summary: Get ML analysis statistics
+      description: Retrieve statistical insights from machine learning analyses for a specific user.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          description: User ID (must be own ID unless admin)
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Analysis statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      totalAnalyses:
+                        type: integer
+                        example: 45
+                      classificationBreakdown:
+                        type: object
+                        properties:
+                          hunger:
+                            type: object
+                            properties:
+                              count:
+                                type: integer
+                                example: 18
+                              percentage:
+                                type: number
+                                example: 40
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '403':
+          $ref: ../responses/common.yaml#/Forbidden
+        '404':
+          $ref: ../responses/common.yaml#/NotFound
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Retrieve the current user's profile information.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: ../schemas/user.yaml#/UserProfile
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+    put:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update the current user's profile information.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                  maxLength: 50
+                  example: John
+                lastName:
+                  type: string
+                  maxLength: 50
+                  example: Doe
+                phone:
+                  type: string
+                  example: '+1234567890'
+                dateOfBirth:
+                  type: string
+                  format: date
+                  example: '1990-01-15'
+                location:
+                  type: string
+                  example: San Francisco, CA
+                timeZone:
+                  type: string
+                  example: America/Los_Angeles
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Profile updated successfully
+                  data:
+                    $ref: ../schemas/user.yaml#/UserProfile
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /users/upload-avatar:
+    post:
+      tags:
+        - Users
+      summary: Upload user avatar
+      description: Upload a new avatar image for the current user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - avatar
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+                  description: Avatar image file (JPEG, PNG, WebP, max 5MB)
+            encoding:
+              avatar:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '200':
+          description: Avatar uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Avatar uploaded successfully
+                  data:
+                    type: object
+                    properties:
+                      avatarUrl:
+                        type: string
+                        example: https://api.suatalk.site/uploads/avatars/user123_avatar.jpg
+                      uploadedAt:
+                        type: string
+                        format: date-time
+                        example: '2024-01-15T10:30:00.000Z'
+        '400':
+          description: Invalid file or file too large
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '415':
+          description: Unsupported media type
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/common.yaml#/ErrorResponse
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+  /users/account:
+    delete:
+      tags:
+        - Users
+      summary: Delete user account
+      description: |
+        Permanently delete the current user's account and all associated data.
+        This action cannot be undone.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+                - confirmation
+              properties:
+                password:
+                  type: string
+                  example: CurrentPassword123!
+                  description: Current password for verification
+                confirmation:
+                  type: string
+                  example: DELETE
+                  description: Must be exactly 'DELETE' to confirm account deletion
+                reason:
+                  type: string
+                  example: No longer needed
+                  description: Optional reason for account deletion
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Account deleted successfully
+        '400':
+          $ref: ../responses/common.yaml#/BadRequest
+        '401':
+          $ref: ../responses/common.yaml#/Unauthorized
+        '429':
+          $ref: ../responses/common.yaml#/TooManyRequests
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+  schemas:
+    APIKey:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+          description: Unique API key ID
+        name:
+          type: string
+          example: Mobile App Integration
+          description: Descriptive name for the API key
+        description:
+          type: string
+          example: API key for mobile application authentication
+          description: Description of the API key purpose
+        keyPrefix:
+          type: string
+          example: sk_live_abc123
+          description: Public prefix of the API key (first 10 characters)
+        permissions:
+          type: array
+          items:
+            type: string
+            enum:
+              - read
+              - write
+              - delete
+              - admin
+          example:
+            - read
+            - write
+          description: Permissions granted to this API key
+        status:
+          type: string
+          enum:
+            - active
+            - revoked
+            - expired
+          example: active
+          description: Current status of the API key
+        lastUsed:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+          description: When the API key was last used
+          nullable: true
+        usageCount:
+          type: integer
+          example: 150
+          description: Total number of requests made with this key
+        rateLimit:
+          type: object
+          properties:
+            requestsPerMinute:
+              type: integer
+              example: 100
+            requestsPerHour:
+              type: integer
+              example: 1000
+            requestsPerDay:
+              type: integer
+              example: 10000
+        expiresAt:
+          type: string
+          format: date-time
+          example: '2025-01-15T10:30:00.000Z'
+          description: When the API key expires
+          nullable: true
+        userId:
+          type: string
+          example: 507f1f77bcf86cd799439010
+          description: ID of the user who owns this API key
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        revokedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+          description: When the API key was revoked
+          nullable: true
+        revokeReason:
+          type: string
+          example: Suspected compromise
+          description: Reason for revocation
+          nullable: true
+    APIKeyWithSecret:
+      allOf:
+        - $ref: '#/APIKey'
+        - type: object
+          properties:
+            key:
+              type: string
+              example: sk_live_abc123def456ghi789jkl012mno345pqr678stu
+              description: The full API key secret (only shown once upon creation/rotation)
+    APIKeyWithStats:
+      allOf:
+        - $ref: '#/APIKey'
+        - type: object
+          properties:
+            statistics:
+              type: object
+              properties:
+                totalRequests:
+                  type: integer
+                  example: 1250
+                successfulRequests:
+                  type: integer
+                  example: 1180
+                failedRequests:
+                  type: integer
+                  example: 70
+                rateLimitedRequests:
+                  type: integer
+                  example: 25
+                averageResponseTime:
+                  type: number
+                  example: 245.5
+                lastWeekUsage:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                      requests:
+                        type: integer
+                  example:
+                    - date: '2024-01-08'
+                      requests: 45
+                    - date: '2024-01-09'
+                      requests: 52
+                topEndpoints:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      endpoint:
+                        type: string
+                      requests:
+                        type: integer
+                  example:
+                    - endpoint: /api/audio/upload
+                      requests: 450
+                    - endpoint: /api/users/profile
+                      requests: 320
+    AudioRecording:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+          description: Unique recording ID
+        title:
+          type: string
+          example: Evening cry session
+          description: Title for the recording
+        babyId:
+          type: string
+          example: 507f1f77bcf86cd799439010
+          description: ID of the baby this recording belongs to
+        userId:
+          type: string
+          example: 507f1f77bcf86cd799439009
+          description: ID of the user who uploaded the recording
+        fileName:
+          type: string
+          example: recording_20240115_183000.wav
+          description: Original filename
+        fileUrl:
+          type: string
+          example: https://api.suatalk.site/uploads/audio/recording123.wav
+          description: URL to the audio file
+        fileSize:
+          type: integer
+          example: 2048576
+          description: File size in bytes
+        duration:
+          type: number
+          format: float
+          example: 45.2
+          description: Duration in seconds
+        format:
+          type: string
+          enum:
+            - wav
+            - mp3
+            - m4a
+            - flac
+          example: wav
+          description: Audio file format
+        sampleRate:
+          type: integer
+          example: 44100
+          description: Audio sample rate in Hz
+        bitRate:
+          type: integer
+          example: 320000
+          description: Audio bit rate in bps
+        channels:
+          type: integer
+          example: 1
+          description: Number of audio channels (1=mono, 2=stereo)
+        notes:
+          type: string
+          example: Baby was crying before bedtime, seemed tired
+          description: User notes about the recording context
+        recordingDate:
+          type: string
+          format: date-time
+          example: '2024-01-15T18:30:00.000Z'
+          description: When the recording was made
+        uploadedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T18:35:00.000Z'
+          description: When the file was uploaded
+        analysisStatus:
+          type: string
+          enum:
+            - pending
+            - processing
+            - completed
+            - failed
+          example: completed
+          description: ML analysis status
+        analysisStartedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T18:36:00.000Z'
+          description: When analysis was started
+        analysisCompletedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T18:36:45.000Z'
+          description: When analysis was completed
+        isDeleted:
+          type: boolean
+          example: false
+          description: Soft delete flag
+    AudioRecordingWithAnalysis:
+      allOf:
+        - $ref: '#/AudioRecording'
+        - type: object
+          properties:
+            analysis:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: analysis_abc123
+                primaryClassification:
+                  type: object
+                  properties:
+                    class:
+                      type: string
+                      example: hunger
+                    confidence:
+                      type: number
+                      example: 0.87
+                    name:
+                      type: string
+                      example: Hunger
+                allClassifications:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      class:
+                        type: string
+                      confidence:
+                        type: number
+                      name:
+                        type: string
+                  example:
+                    - class: hunger
+                      confidence: 0.87
+                      name: Hunger
+                    - class: discomfort
+                      confidence: 0.12
+                      name: Discomfort
+                audioFeatures:
+                  type: object
+                  properties:
+                    averageIntensity:
+                      type: number
+                      example: 0.68
+                    peakFrequency:
+                      type: number
+                      example: 312.4
+                    spectralCentroid:
+                      type: number
+                      example: 1250.5
+                modelVersion:
+                  type: string
+                  example: v2.1.0
+                processingTime:
+                  type: number
+                  example: 12.3
+                  description: Processing time in seconds
+    MLAnalysisResult:
+      type: object
+      properties:
+        prediction:
+          type: string
+          enum:
+            - burping
+            - discomfort
+            - belly_pain
+            - hungry
+            - tired
+          example: hungry
+          nullable: true
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.85
+          nullable: true
+        allPredictions:
+          type: object
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 1
+          example:
+            burping: 0.05
+            discomfort: 0.08
+            belly_pain: 0.02
+            hungry: 0.85
+            tired: 0
+          nullable: true
+        modelVersion:
+          type: string
+          example: 1.0.0
+        processingTime:
+          type: number
+          example: 1234
+          description: Processing time in milliseconds
+        analyzedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+          nullable: true
+        error:
+          type: string
+          example: Audio quality too low for analysis
+          nullable: true
+    MLServiceStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+          example: healthy
+        version:
+          type: string
+          example: 1.0.0
+        uptime:
+          type: number
+          example: 86400
+          description: Service uptime in seconds
+        modelsLoaded:
+          type: array
+          items:
+            type: string
+          example:
+            - cry_classifier_v1
+            - emotion_detector_v2
+        lastHealthCheck:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        responseTime:
+          type: number
+          example: 150
+          description: Average response time in milliseconds
+    Baby:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+          description: Unique baby profile ID
+        name:
+          type: string
+          example: Emma Johnson
+          description: Baby's full name
+        dateOfBirth:
+          type: string
+          format: date
+          example: '2024-01-15'
+          description: Baby's date of birth
+        gender:
+          type: string
+          enum:
+            - male
+            - female
+            - other
+          example: female
+        weight:
+          type: number
+          format: float
+          example: 3.5
+          description: Current weight in kilograms
+        height:
+          type: number
+          format: float
+          example: 50.5
+          description: Current height in centimeters
+        notes:
+          type: string
+          example: Born at 3:45 AM, healthy baby
+          description: Additional notes about the baby
+        photoUrl:
+          type: string
+          example: https://api.suatalk.site/uploads/babies/baby123_photo.jpg
+          description: URL to baby's photo
+        parentId:
+          type: string
+          example: 507f1f77bcf86cd799439010
+          description: ID of the parent user
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        isDeleted:
+          type: boolean
+          example: false
+          description: Soft delete flag
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: An error occurred
+        error:
+          type: string
+          example: Validation failed
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: email
+              message:
+                type: string
+                example: Email is required
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation completed successfully
+        data:
+          type: object
+    ValidationError:
+      type: object
+      properties:
+        error:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Validation failed
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+                example: field
+              value:
+                type: string
+                example: invalid@
+              msg:
+                type: string
+                example: Please enter a valid email address
+              path:
+                type: string
+                example: email
+              location:
+                type: string
+                example: body
+    Pagination:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+          minimum: 1
+          example: 1
+        totalPages:
+          type: integer
+          minimum: 1
+          example: 5
+        totalRecords:
+          type: integer
+          minimum: 0
+          example: 100
+        recordsPerPage:
+          type: integer
+          minimum: 1
+          example: 20
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPrevPage:
+          type: boolean
+          example: false
+    RateLimitInfo:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 100
+          description: Maximum requests allowed in the time window
+        remaining:
+          type: integer
+          example: 95
+          description: Remaining requests in the current time window
+        reset:
+          type: integer
+          example: 1642248600
+          description: Unix timestamp when the rate limit resets
+        retryAfter:
+          type: integer
+          example: 300
+          description: Seconds to wait before making another request
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+          description: Unique user identifier
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phone:
+          type: string
+          example: '+1234567890'
+          nullable: true
+        profilePicture:
+          type: string
+          example: https://example.com/avatar.jpg
+          nullable: true
+        isEmailVerified:
+          type: boolean
+          example: true
+        isActive:
+          type: boolean
+          example: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+        updatedAt:
+          type: string
+          format: date-time
+          example: '2024-01-15T10:30:00.000Z'
+    TokenResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login successful
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/User'
+            tokens:
+              type: object
+              properties:
+                accessToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  description: JWT access token (expires in 15 minutes)
+                refreshToken:
+                  type: string
+                  example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  description: JWT refresh token (expires in 30 days)
+                tokenType:
+                  type: string
+                  example: Bearer
+                expiresIn:
+                  type: integer
+                  example: 900
+                  description: Access token expiration time in seconds
+  responses:
+    BadRequest:
+      description: Bad request - validation error
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/common.yaml#/Error
+          example:
+            success: false
+            message: Validation failed
+            error: Bad Request
+            details:
+              - field: email
+                message: Email is required
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/common.yaml#/Error
+          example:
+            success: false
+            message: Authentication required
+            error: Unauthorized
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/common.yaml#/Error
+          example:
+            success: false
+            message: Insufficient permissions
+            error: Forbidden
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/common.yaml#/Error
+          example:
+            success: false
+            message: Resource not found
+            error: Not Found
+    TooManyRequests:
+      description: Too many requests - rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+            example: 100
+          description: Maximum requests allowed in the time window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+            example: 0
+          description: Remaining requests in the current time window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+            example: 1642248600
+          description: Unix timestamp when the rate limit resets
+        Retry-After:
+          schema:
+            type: integer
+            example: 300
+          description: Seconds to wait before making another request
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: ../schemas/common.yaml#/Error
+              - type: object
+                properties:
+                  rateLimitInfo:
+                    $ref: ../schemas/common.yaml#/RateLimitInfo
+          example:
+            success: false
+            message: Too many requests from this IP, please try again later.
+            error: Too Many Requests
+            rateLimitInfo:
+              limit: 100
+              remaining: 0
+              reset: 1642248600
+              retryAfter: 300
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/common.yaml#/Error
+          example:
+            success: false
+            message: Internal server error
+            error: Internal Server Error
+security:
+  - bearerAuth: []

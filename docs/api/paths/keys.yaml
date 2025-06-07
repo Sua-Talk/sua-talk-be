@@ -1,0 +1,446 @@
+/keys:
+  post:
+    tags:
+      - API Keys
+    summary: Create new API key
+    description: "Create a new API key for programmatic access to the SuaTalk API."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+                maxLength: 100
+                example: "Mobile App Integration"
+                description: "Descriptive name for the API key"
+              description:
+                type: string
+                maxLength: 500
+                example: "API key for mobile application authentication"
+                description: "Optional description of the API key purpose"
+              permissions:
+                type: array
+                items:
+                  type: string
+                  enum: [read, write, delete, admin]
+                example: ["read", "write"]
+                description: "Permissions granted to this API key"
+              expiresAt:
+                type: string
+                format: date-time
+                example: "2025-01-15T10:30:00.000Z"
+                description: "Optional expiration date for the API key"
+    responses:
+      '201':
+        description: API key created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "API key created successfully"
+                data:
+                  $ref: '../schemas/apikey.yaml#/APIKeyWithSecret'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  get:
+    tags:
+      - API Keys
+    summary: List API keys
+    description: "Retrieve all API keys for the authenticated user. Admins can see all keys."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: page
+        in: query
+        description: "Page number for pagination"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        description: "Number of keys per page"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: status
+        in: query
+        description: "Filter by API key status"
+        required: false
+        schema:
+          type: string
+          enum: [active, revoked, expired]
+      - name: userId
+        in: query
+        description: "Filter by user ID (admin only)"
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: API keys retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/apikey.yaml#/APIKey'
+                pagination:
+                  $ref: '../schemas/common.yaml#/PaginationInfo'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/keys/stats:
+  get:
+    tags:
+      - API Keys
+    summary: Get API key usage statistics
+    description: "Retrieve usage statistics for API keys owned by the authenticated user."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: period
+        in: query
+        description: "Time period for statistics"
+        required: false
+        schema:
+          type: string
+          enum: [today, week, month, quarter, year]
+          default: "month"
+      - name: keyId
+        in: query
+        description: "Get stats for specific API key"
+        required: false
+        schema:
+          type: string
+    responses:
+      '200':
+        description: API key statistics retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    period:
+                      type: string
+                      example: "month"
+                    totalRequests:
+                      type: integer
+                      example: 1250
+                    successfulRequests:
+                      type: integer
+                      example: 1180
+                    failedRequests:
+                      type: integer
+                      example: 70
+                    rateLimitedRequests:
+                      type: integer
+                      example: 25
+                    averageResponseTime:
+                      type: number
+                      example: 245.5
+                    topEndpoints:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          endpoint:
+                            type: string
+                            example: "/api/audio/upload"
+                          requests:
+                            type: integer
+                            example: 450
+                    dailyUsage:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          date:
+                            type: string
+                            format: date
+                          requests:
+                            type: integer
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/keys/{id}:
+  get:
+    tags:
+      - API Keys
+    summary: Get API key details
+    description: "Retrieve details for a specific API key by its ID."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "API key ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: API key details retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/apikey.yaml#/APIKeyWithStats'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  put:
+    tags:
+      - API Keys
+    summary: Update API key
+    description: "Update properties of an existing API key."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "API key ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                maxLength: 100
+                example: "Updated Mobile App Key"
+              description:
+                type: string
+                maxLength: 500
+                example: "Updated description for mobile app integration"
+              permissions:
+                type: array
+                items:
+                  type: string
+                  enum: [read, write, delete, admin]
+                example: ["read", "write", "delete"]
+              expiresAt:
+                type: string
+                format: date-time
+                example: "2025-06-15T10:30:00.000Z"
+    responses:
+      '200':
+        description: API key updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "API key updated successfully"
+                data:
+                  $ref: '../schemas/apikey.yaml#/APIKey'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  delete:
+    tags:
+      - API Keys
+    summary: Delete API key
+    description: |
+      Permanently delete an API key. This action cannot be undone and will 
+      immediately invalidate the key.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "API key ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: API key deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "API key deleted successfully"
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/keys/{id}/rotate:
+  post:
+    tags:
+      - API Keys
+    summary: Rotate API key
+    description: |
+      Generate a new secret for an existing API key. The old secret will be 
+      immediately invalidated.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "API key ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: API key rotated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "API key rotated successfully"
+                data:
+                  $ref: '../schemas/apikey.yaml#/APIKeyWithSecret'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/keys/{id}/revoke:
+  post:
+    tags:
+      - API Keys
+    summary: Revoke API key
+    description: |
+      Revoke (deactivate) an API key without deleting it. The key can be 
+      reactivated later if needed.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "API key ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              reason:
+                type: string
+                maxLength: 200
+                example: "Suspected compromise"
+                description: "Optional reason for revocation"
+    responses:
+      '200':
+        description: API key revoked successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "API key revoked successfully"
+                data:
+                  $ref: '../schemas/apikey.yaml#/APIKey'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests' 

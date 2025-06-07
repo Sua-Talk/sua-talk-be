@@ -1,0 +1,77 @@
+User:
+  type: object
+  properties:
+    _id:
+      type: string
+      example: "507f1f77bcf86cd799439011"
+      description: "Unique user identifier"
+    email:
+      type: string
+      format: email
+      example: "user@example.com"
+    firstName:
+      type: string
+      example: "John"
+    lastName:
+      type: string
+      example: "Doe"
+    phone:
+      type: string
+      example: "+1234567890"
+      nullable: true
+    profilePicture:
+      type: string
+      example: "https://example.com/avatar.jpg"
+      nullable: true
+    isEmailVerified:
+      type: boolean
+      example: true
+    isActive:
+      type: boolean
+      example: true
+    lastLoginAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+      nullable: true
+    createdAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    updatedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+
+TokenResponse:
+  type: object
+  properties:
+    success:
+      type: boolean
+      example: true
+    message:
+      type: string
+      example: "Login successful"
+    data:
+      type: object
+      properties:
+        user:
+          $ref: '#/User'
+        tokens:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              description: "JWT access token (expires in 15 minutes)"
+            refreshToken:
+              type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              description: "JWT refresh token (expires in 30 days)"
+            tokenType:
+              type: string
+              example: "Bearer"
+            expiresIn:
+              type: integer
+              example: 900
+              description: "Access token expiration time in seconds" 

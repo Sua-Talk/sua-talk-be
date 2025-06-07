@@ -1,0 +1,415 @@
+/audio/upload:
+  post:
+    tags:
+      - Audio
+    summary: Upload audio recording
+    description: |
+      Upload an audio recording for baby cry analysis. The audio file will be 
+      processed for machine learning analysis automatically.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [audio, babyId]
+            properties:
+              audio:
+                type: string
+                format: binary
+                description: "Audio file (WAV, MP3, M4A, max 50MB, max 5 minutes)"
+              babyId:
+                type: string
+                example: "507f1f77bcf86cd799439011"
+                description: "ID of the baby this recording belongs to"
+              title:
+                type: string
+                maxLength: 100
+                example: "Evening cry session"
+                description: "Optional title for the recording"
+              notes:
+                type: string
+                maxLength: 500
+                example: "Baby was crying before bedtime, seemed tired"
+                description: "Optional notes about the recording context"
+              recordingDate:
+                type: string
+                format: date-time
+                example: "2024-01-15T18:30:00.000Z"
+                description: "When the recording was made (defaults to upload time)"
+          encoding:
+            audio:
+              contentType: audio/wav, audio/mpeg, audio/mp4
+    responses:
+      '201':
+        description: Audio uploaded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Audio recording uploaded successfully"
+                data:
+                  $ref: '../schemas/audio.yaml#/AudioRecording'
+      '400':
+        description: Invalid file format or size
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '413':
+        description: File too large
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '415':
+        description: Unsupported audio format
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/audio/recordings:
+  get:
+    tags:
+      - Audio
+    summary: Get all audio recordings
+    description: "Retrieve all audio recordings for the authenticated user with optional filtering."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: babyId
+        in: query
+        description: "Filter recordings by baby ID"
+        required: false
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+      - name: status
+        in: query
+        description: "Filter by analysis status"
+        required: false
+        schema:
+          type: string
+          enum: [pending, processing, completed, failed]
+          example: "completed"
+      - name: page
+        in: query
+        description: "Page number for pagination"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        description: "Number of recordings per page"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 20
+      - name: sortBy
+        in: query
+        description: "Sort recordings by field"
+        required: false
+        schema:
+          type: string
+          enum: [uploadedAt, recordingDate, title]
+          default: "uploadedAt"
+      - name: sortOrder
+        in: query
+        description: "Sort order"
+        required: false
+        schema:
+          type: string
+          enum: [asc, desc]
+          default: "desc"
+    responses:
+      '200':
+        description: Audio recordings retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/audio.yaml#/AudioRecording'
+                pagination:
+                  $ref: '../schemas/common.yaml#/PaginationInfo'
+                filters:
+                  type: object
+                  properties:
+                    babyId:
+                      type: string
+                    status:
+                      type: string
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/audio/recordings/{id}:
+  get:
+    tags:
+      - Audio
+    summary: Get audio recording by ID
+    description: "Retrieve a specific audio recording with analysis results."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Audio recording ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Audio recording retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/audio.yaml#/AudioRecordingWithAnalysis'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  delete:
+    tags:
+      - Audio
+    summary: Delete audio recording
+    description: |
+      Permanently delete an audio recording and its associated analysis data.
+      This action cannot be undone.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Audio recording ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Audio recording deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Audio recording deleted successfully"
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/audio/pending-analysis:
+  get:
+    tags:
+      - Audio
+    summary: Get pending analysis recordings
+    description: "Retrieve audio recordings that are pending ML analysis for the user."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: limit
+        in: query
+        description: "Maximum number of pending recordings to return"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+    responses:
+      '200':
+        description: Pending recordings retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/audio.yaml#/AudioRecording'
+                count:
+                  type: integer
+                  example: 5
+                  description: "Number of pending recordings"
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/audio/batch-analyze:
+  post:
+    tags:
+      - Audio
+    summary: Trigger batch ML analysis
+    description: |
+      Trigger ML analysis for multiple recordings or all pending recordings.
+      Analysis will be performed asynchronously in the background.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              recordingIds:
+                type: array
+                maxItems: 20
+                items:
+                  type: string
+                example: ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+                description: "Array of recording IDs to analyze (max 20)"
+              analyzeAllPending:
+                type: boolean
+                example: false
+                description: "Set to true to analyze all pending recordings"
+            oneOf:
+              - required: [recordingIds]
+              - required: [analyzeAllPending]
+    responses:
+      '202':
+        description: Batch analysis triggered successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Batch analysis triggered for 5 recordings"
+                data:
+                  type: object
+                  properties:
+                    jobId:
+                      type: string
+                      example: "batch_analysis_abc123"
+                    recordingCount:
+                      type: integer
+                      example: 5
+                    estimatedCompletionTime:
+                      type: string
+                      format: date-time
+                      example: "2024-01-15T19:00:00.000Z"
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/audio/cleanup:
+  post:
+    tags:
+      - Audio
+    summary: Cleanup orphaned audio files
+    description: |
+      Maintenance endpoint to cleanup orphaned audio files that exist in storage 
+      but have no corresponding database records.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              dryRun:
+                type: boolean
+                default: true
+                example: true
+                description: "If true, only reports what would be cleaned without deleting"
+              olderThanDays:
+                type: integer
+                minimum: 1
+                default: 7
+                example: 30
+                description: "Only cleanup files older than this many days"
+    responses:
+      '200':
+        description: Cleanup operation completed
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Cleanup completed"
+                data:
+                  type: object
+                  properties:
+                    filesFound:
+                      type: integer
+                      example: 12
+                    filesDeleted:
+                      type: integer
+                      example: 8
+                    spaceSaved:
+                      type: string
+                      example: "145.2 MB"
+                    dryRun:
+                      type: boolean
+                      example: false
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests' 

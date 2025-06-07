@@ -1,0 +1,54 @@
+Baby:
+  type: object
+  properties:
+    id:
+      type: string
+      example: "507f1f77bcf86cd799439011"
+      description: "Unique baby profile ID"
+    name:
+      type: string
+      example: "Emma Johnson"
+      description: "Baby's full name"
+    dateOfBirth:
+      type: string
+      format: date
+      example: "2024-01-15"
+      description: "Baby's date of birth"
+    gender:
+      type: string
+      enum: [male, female, other]
+      example: "female"
+    weight:
+      type: number
+      format: float
+      example: 3.5
+      description: "Current weight in kilograms"
+    height:
+      type: number
+      format: float
+      example: 50.5
+      description: "Current height in centimeters"
+    notes:
+      type: string
+      example: "Born at 3:45 AM, healthy baby"
+      description: "Additional notes about the baby"
+    photoUrl:
+      type: string
+      example: "https://api.suatalk.site/uploads/babies/baby123_photo.jpg"
+      description: "URL to baby's photo"
+    parentId:
+      type: string
+      example: "507f1f77bcf86cd799439010"
+      description: "ID of the parent user"
+    createdAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    updatedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    isDeleted:
+      type: boolean
+      example: false
+      description: "Soft delete flag" 

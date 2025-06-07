@@ -1,0 +1,145 @@
+APIKey:
+  type: object
+  properties:
+    id:
+      type: string
+      example: "507f1f77bcf86cd799439011"
+      description: "Unique API key ID"
+    name:
+      type: string
+      example: "Mobile App Integration"
+      description: "Descriptive name for the API key"
+    description:
+      type: string
+      example: "API key for mobile application authentication"
+      description: "Description of the API key purpose"
+    keyPrefix:
+      type: string
+      example: "sk_live_abc123"
+      description: "Public prefix of the API key (first 10 characters)"
+    permissions:
+      type: array
+      items:
+        type: string
+        enum: [read, write, delete, admin]
+      example: ["read", "write"]
+      description: "Permissions granted to this API key"
+    status:
+      type: string
+      enum: [active, revoked, expired]
+      example: "active"
+      description: "Current status of the API key"
+    lastUsed:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+      description: "When the API key was last used"
+      nullable: true
+    usageCount:
+      type: integer
+      example: 150
+      description: "Total number of requests made with this key"
+    rateLimit:
+      type: object
+      properties:
+        requestsPerMinute:
+          type: integer
+          example: 100
+        requestsPerHour:
+          type: integer
+          example: 1000
+        requestsPerDay:
+          type: integer
+          example: 10000
+    expiresAt:
+      type: string
+      format: date-time
+      example: "2025-01-15T10:30:00.000Z"
+      description: "When the API key expires"
+      nullable: true
+    userId:
+      type: string
+      example: "507f1f77bcf86cd799439010"
+      description: "ID of the user who owns this API key"
+    createdAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    updatedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+    revokedAt:
+      type: string
+      format: date-time
+      example: "2024-01-15T10:30:00.000Z"
+      description: "When the API key was revoked"
+      nullable: true
+    revokeReason:
+      type: string
+      example: "Suspected compromise"
+      description: "Reason for revocation"
+      nullable: true
+
+APIKeyWithSecret:
+  allOf:
+    - $ref: '#/APIKey'
+    - type: object
+      properties:
+        key:
+          type: string
+          example: "sk_live_abc123def456ghi789jkl012mno345pqr678stu"
+          description: "The full API key secret (only shown once upon creation/rotation)"
+
+APIKeyWithStats:
+  allOf:
+    - $ref: '#/APIKey'
+    - type: object
+      properties:
+        statistics:
+          type: object
+          properties:
+            totalRequests:
+              type: integer
+              example: 1250
+            successfulRequests:
+              type: integer
+              example: 1180
+            failedRequests:
+              type: integer
+              example: 70
+            rateLimitedRequests:
+              type: integer
+              example: 25
+            averageResponseTime:
+              type: number
+              example: 245.5
+            lastWeekUsage:
+              type: array
+              items:
+                type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
+                  requests:
+                    type: integer
+              example:
+                - date: "2024-01-08"
+                  requests: 45
+                - date: "2024-01-09"
+                  requests: 52
+            topEndpoints:
+              type: array
+              items:
+                type: object
+                properties:
+                  endpoint:
+                    type: string
+                  requests:
+                    type: integer
+              example:
+                - endpoint: "/api/audio/upload"
+                  requests: 450
+                - endpoint: "/api/users/profile"
+                  requests: 320 

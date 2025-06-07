@@ -1,0 +1,204 @@
+/users/profile:
+  get:
+    tags:
+      - Users
+    summary: Get user profile
+    description: "Retrieve the current user's profile information."
+    security:
+      - bearerAuth: []
+    responses:
+      '200':
+        description: User profile retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/user.yaml#/UserProfile'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  put:
+    tags:
+      - Users
+    summary: Update user profile
+    description: "Update the current user's profile information."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              firstName:
+                type: string
+                maxLength: 50
+                example: "John"
+              lastName:
+                type: string
+                maxLength: 50
+                example: "Doe"
+              phone:
+                type: string
+                example: "+1234567890"
+              dateOfBirth:
+                type: string
+                format: date
+                example: "1990-01-15"
+              location:
+                type: string
+                example: "San Francisco, CA"
+              timeZone:
+                type: string
+                example: "America/Los_Angeles"
+    responses:
+      '200':
+        description: Profile updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Profile updated successfully"
+                data:
+                  $ref: '../schemas/user.yaml#/UserProfile'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/users/upload-avatar:
+  post:
+    tags:
+      - Users
+    summary: Upload user avatar
+    description: "Upload a new avatar image for the current user."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [avatar]
+            properties:
+              avatar:
+                type: string
+                format: binary
+                description: "Avatar image file (JPEG, PNG, WebP, max 5MB)"
+          encoding:
+            avatar:
+              contentType: image/jpeg, image/png, image/webp
+    responses:
+      '200':
+        description: Avatar uploaded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Avatar uploaded successfully"
+                data:
+                  type: object
+                  properties:
+                    avatarUrl:
+                      type: string
+                      example: "https://api.suatalk.site/uploads/avatars/user123_avatar.jpg"
+                    uploadedAt:
+                      type: string
+                      format: date-time
+                      example: "2024-01-15T10:30:00.000Z"
+      '400':
+        description: Invalid file or file too large
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '413':
+        description: File too large
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '415':
+        description: Unsupported media type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/users/account:
+  delete:
+    tags:
+      - Users
+    summary: Delete user account
+    description: |
+      Permanently delete the current user's account and all associated data.
+      This action cannot be undone.
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [password, confirmation]
+            properties:
+              password:
+                type: string
+                example: "CurrentPassword123!"
+                description: "Current password for verification"
+              confirmation:
+                type: string
+                example: "DELETE"
+                description: "Must be exactly 'DELETE' to confirm account deletion"
+              reason:
+                type: string
+                example: "No longer needed"
+                description: "Optional reason for account deletion"
+    responses:
+      '200':
+        description: Account deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Account deleted successfully"
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests' 

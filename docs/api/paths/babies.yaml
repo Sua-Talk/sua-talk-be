@@ -1,0 +1,395 @@
+/babies:
+  post:
+    tags:
+      - Babies
+    summary: Create new baby profile
+    description: "Create a new baby profile for the current user."
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, dateOfBirth, gender]
+            properties:
+              name:
+                type: string
+                maxLength: 100
+                example: "Emma Johnson"
+                description: "Baby's full name"
+              dateOfBirth:
+                type: string
+                format: date
+                example: "2024-01-15"
+                description: "Baby's date of birth"
+              gender:
+                type: string
+                enum: [male, female, other]
+                example: "female"
+              weight:
+                type: number
+                format: float
+                example: 3.5
+                description: "Birth weight in kilograms"
+              height:
+                type: number
+                format: float
+                example: 50.5
+                description: "Birth height in centimeters"
+              notes:
+                type: string
+                maxLength: 500
+                example: "Born at 3:45 AM, healthy baby"
+                description: "Additional notes about the baby"
+    responses:
+      '201':
+        description: Baby profile created successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Baby profile created successfully"
+                data:
+                  $ref: '../schemas/baby.yaml#/Baby'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  get:
+    tags:
+      - Babies
+    summary: Get all baby profiles
+    description: "Retrieve all baby profiles for the authenticated user."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: page
+        in: query
+        description: "Page number for pagination"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        description: "Number of babies per page"
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+    responses:
+      '200':
+        description: Baby profiles retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: array
+                  items:
+                    $ref: '../schemas/baby.yaml#/Baby'
+                pagination:
+                  $ref: '../schemas/common.yaml#/PaginationInfo'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/babies/{id}:
+  get:
+    tags:
+      - Babies
+    summary: Get baby profile by ID
+    description: "Retrieve a specific baby profile by its ID."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Baby profile ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Baby profile retrieved successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  $ref: '../schemas/baby.yaml#/Baby'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  put:
+    tags:
+      - Babies
+    summary: Update baby profile
+    description: "Update an existing baby profile."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Baby profile ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              name:
+                type: string
+                maxLength: 100
+                example: "Emma Johnson"
+              dateOfBirth:
+                type: string
+                format: date
+                example: "2024-01-15"
+              gender:
+                type: string
+                enum: [male, female, other]
+                example: "female"
+              weight:
+                type: number
+                format: float
+                example: 4.2
+                description: "Current weight in kilograms"
+              height:
+                type: number
+                format: float
+                example: 55.0
+                description: "Current height in centimeters"
+              notes:
+                type: string
+                maxLength: 500
+                example: "Growing well, very active baby"
+    responses:
+      '200':
+        description: Baby profile updated successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Baby profile updated successfully"
+                data:
+                  $ref: '../schemas/baby.yaml#/Baby'
+      '400':
+        $ref: '../responses/common.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+  delete:
+    tags:
+      - Babies
+    summary: Delete baby profile
+    description: |
+      Soft delete a baby profile. The profile will be marked as deleted 
+      but retained in the system for data integrity.
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Baby profile ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Baby profile deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Baby profile deleted successfully"
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/babies/{id}/upload-photo:
+  post:
+    tags:
+      - Babies
+    summary: Upload baby photo
+    description: "Upload a photo for a specific baby profile."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Baby profile ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [photo]
+            properties:
+              photo:
+                type: string
+                format: binary
+                description: "Baby photo (JPEG, PNG, WebP, max 10MB)"
+              caption:
+                type: string
+                maxLength: 200
+                description: "Optional photo caption"
+          encoding:
+            photo:
+              contentType: image/jpeg, image/png, image/webp
+    responses:
+      '200':
+        description: Photo uploaded successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Photo uploaded successfully"
+                data:
+                  type: object
+                  properties:
+                    photoUrl:
+                      type: string
+                      example: "https://api.suatalk.site/uploads/babies/baby123_photo.jpg"
+                    uploadedAt:
+                      type: string
+                      format: date-time
+                      example: "2024-01-15T10:30:00.000Z"
+                    caption:
+                      type: string
+                      example: "Emma's first smile"
+      '400':
+        description: Invalid file or file too large
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '413':
+        description: File too large
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '415':
+        description: Unsupported media type
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/common.yaml#/ErrorResponse'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests'
+
+/babies/{id}/photo:
+  delete:
+    tags:
+      - Babies
+    summary: Delete baby photo
+    description: "Delete the photo associated with a baby profile."
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        description: "Baby profile ID"
+        required: true
+        schema:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+    responses:
+      '200':
+        description: Photo deleted successfully
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                message:
+                  type: string
+                  example: "Baby photo deleted successfully"
+      '401':
+        $ref: '../responses/common.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses/common.yaml#/Forbidden'
+      '404':
+        $ref: '../responses/common.yaml#/NotFound'
+      '429':
+        $ref: '../responses/common.yaml#/TooManyRequests' 

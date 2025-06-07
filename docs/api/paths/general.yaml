@@ -1,0 +1,94 @@
+/:
+  get:
+    summary: API Root
+    description: Returns basic API information and available endpoints
+    tags:
+      - General
+    responses:
+      '200':
+        description: API information
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "SuaTalk Backend API"
+                version:
+                  type: string
+                  example: "1.0.0"
+                status:
+                  type: string
+                  example: "running"
+                endpoints:
+                  type: object
+                  properties:
+                    health:
+                      type: string
+                      example: "/health"
+                    auth:
+                      type: string
+                      example: "/auth"
+                    users:
+                      type: string
+                      example: "/users"
+                    babies:
+                      type: string
+                      example: "/babies"
+                    audio:
+                      type: string
+                      example: "/audio"
+                    ml:
+                      type: string
+                      example: "/ml"
+
+/health:
+  get:
+    summary: Health Check
+    description: Returns the health status of the API and its dependencies
+    tags:
+      - General
+    responses:
+      '200':
+        description: Health status
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [ok, degraded]
+                  example: "ok"
+                timestamp:
+                  type: string
+                  format: date-time
+                  example: "2024-01-15T10:30:00.000Z"
+                environment:
+                  type: string
+                  example: "production"
+                version:
+                  type: string
+                  example: "1.0.0"
+                database:
+                  type: object
+                  properties:
+                    state:
+                      type: boolean
+                      example: true
+                    message:
+                      type: string
+                      example: "Connected"
+                jobs:
+                  type: object
+                  properties:
+                    active:
+                      type: integer
+                      example: 0
+                    completed:
+                      type: integer
+                      example: 150
+                    failed:
+                      type: integer
+                      example: 2 
