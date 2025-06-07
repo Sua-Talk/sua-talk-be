@@ -1,6 +1,7 @@
 const Agenda = require('agenda');
 const AudioRecording = require('../models/AudioRecording');
 const mlService = require('../services/mlService');
+const fileStorageService = require('../services/fileStorage');
 
 /**
  * Agenda Job Manager
@@ -153,6 +154,24 @@ class JobManager {
       }
     });
 
+    // Cleanup temporary files older than 24 hours
+    this.agenda.define('cleanup temp files', { priority: 'low' }, async (job) => {
+      try {
+        const result = await fileStorageService.cleanupTempFiles(24);
+        
+        if (result.success) {
+          console.log(`🗑️ ${result.message}`);
+          if (result.errors.length > 0) {
+            console.warn(`⚠️ Some files could not be deleted:`, result.errors);
+          }
+        } else {
+          console.error(`❌ Temp file cleanup failed: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('❌ Temp file cleanup job error:', error);
+      }
+    });
+
     console.log('📋 Job definitions loaded');
   }
 
@@ -206,7 +225,7 @@ class JobManager {
   }
 
   /**
-   * Schedule cleanup job to run daily
+   * Schedule cleanup jobs to run daily
    */
   async scheduleCleanupJob() {
     if (!this.isInitialized) {
@@ -216,9 +235,10 @@ class JobManager {
     try {
       // Schedule daily cleanup at 2 AM
       await this.agenda.every('24 hours', 'cleanup failed jobs');
-      console.log('🗓️ Daily cleanup job scheduled');
+      await this.agenda.every('24 hours', 'cleanup temp files');
+      console.log('🗓️ Daily cleanup jobs scheduled');
     } catch (error) {
-      console.error('❌ Failed to schedule cleanup job:', error);
+      console.error('❌ Failed to schedule cleanup jobs:', error);
       throw error;
     }
   }

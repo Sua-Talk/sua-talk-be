@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const fileStorageService = require('../services/fileStorage');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -70,49 +71,57 @@ const avatarStorage = multer.diskStorage({
   }
 });
 
-// File filter for images
-const imageFileFilter = (req, file, cb) => {
-  // Check if file is an image
-  if (file.mimetype.startsWith('image/')) {
-    // Allowed image types
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
+// File filter for images with enhanced validation
+const imageFileFilter = async (req, file, cb) => {
+  try {
+    // Check if file is an image by MIME type
+    if (file.mimetype.startsWith('image/')) {
+      // Allowed image types
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      
+      if (allowedTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);
+      }
     } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);
+      cb(new Error('Only image files are allowed.'), false);
     }
-  } else {
-    cb(new Error('Only image files are allowed.'), false);
+  } catch (error) {
+    cb(new Error('File validation failed.'), false);
   }
 };
 
-// File filter for audio files
-const audioFileFilter = (req, file, cb) => {
-  // Check if file is an audio file
-  if (file.mimetype.startsWith('audio/')) {
-    // Allowed audio types
-    const allowedTypes = [
-      'audio/wav',
-      'audio/mp3', 
-      'audio/mpeg',
-      'audio/m4a',
-      'audio/flac',
-      'audio/wave',
-      'audio/x-wav'
-    ];
-    
-    // Also check by file extension as backup
-    const extension = path.extname(file.originalname).toLowerCase();
-    const allowedExtensions = ['.wav', '.mp3', '.m4a', '.flac'];
-    
-    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
-      cb(null, true);
+// File filter for audio files with enhanced validation
+const audioFileFilter = async (req, file, cb) => {
+  try {
+    // Check if file is an audio file by MIME type
+    if (file.mimetype.startsWith('audio/')) {
+      // Allowed audio types
+      const allowedTypes = [
+        'audio/wav',
+        'audio/mp3', 
+        'audio/mpeg',
+        'audio/m4a',
+        'audio/flac',
+        'audio/wave',
+        'audio/x-wav'
+      ];
+      
+      // Also check by file extension as backup
+      const extension = path.extname(file.originalname).toLowerCase();
+      const allowedExtensions = ['.wav', '.mp3', '.m4a', '.flac'];
+      
+      if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(extension)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid audio file type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);
+      }
     } else {
-      cb(new Error('Invalid audio file type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);
+      cb(new Error('Only audio files are allowed.'), false);
     }
-  } else {
-    cb(new Error('Only audio files are allowed.'), false);
+  } catch (error) {
+    cb(new Error('Audio file validation failed.'), false);
   }
 };
 

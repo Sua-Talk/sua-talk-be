@@ -5,14 +5,12 @@ const tokenSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'User ID is required'],
-    index: true
+    required: [true, 'User ID is required']
   },
   token: {
     type: String,
     required: [true, 'Token is required'],
-    unique: true,
-    index: true
+    unique: true
   },
   type: {
     type: String,
@@ -20,13 +18,12 @@ const tokenSchema = new mongoose.Schema({
     enum: {
       values: ['refresh', 'reset'],
       message: 'Token type must be either refresh or reset'
-    },
-    index: true
+    }
   },
   expiresAt: {
     type: Date,
-    required: [true, 'Expiration date is required'],
-    index: { expireAfterSeconds: 0 } // TTL index - MongoDB will auto-delete expired tokens
+    required: [true, 'Expiration date is required']
+    // TTL index defined separately below
   },
   // Security metadata
   ipAddress: {
@@ -49,8 +46,7 @@ const tokenSchema = new mongoose.Schema({
   // Token usage tracking
   isUsed: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
   },
   usedAt: {
     type: Date
@@ -75,7 +71,7 @@ const tokenSchema = new mongoose.Schema({
 
 // Indexes for performance and security
 tokenSchema.index({ userId: 1, type: 1, isUsed: 1 });
-tokenSchema.index({ expiresAt: 1 });
+tokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 tokenSchema.index({ createdAt: 1 });
 
 // Compound index for finding valid tokens

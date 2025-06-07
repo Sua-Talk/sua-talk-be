@@ -7,8 +7,7 @@ const otpSchema = new mongoose.Schema({
     required: [true, 'Email is required'],
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email address'],
-    index: true
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email address']
   },
   code: {
     type: String,
@@ -21,18 +20,16 @@ const otpSchema = new mongoose.Schema({
     enum: {
       values: ['email_verification', 'password_reset', 'login_verification'],
       message: 'Purpose must be one of: email_verification, password_reset, login_verification'
-    },
-    index: true
+    }
   },
   isUsed: {
     type: Boolean,
-    default: false,
-    index: true
+    default: false
   },
   expiresAt: {
     type: Date,
-    required: [true, 'Expiration date is required'],
-    index: { expireAfterSeconds: 0 } // TTL index - MongoDB will auto-delete expired documents
+    required: [true, 'Expiration date is required']
+    // TTL index defined separately below
   },
   // Security metadata
   ipAddress: {
@@ -85,7 +82,7 @@ const otpSchema = new mongoose.Schema({
 // Indexes for performance and security
 otpSchema.index({ email: 1, purpose: 1, isUsed: 1 });
 otpSchema.index({ createdAt: 1 });
-otpSchema.index({ expiresAt: 1 });
+otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 
 // Compound index for finding valid OTPs
 otpSchema.index({ 

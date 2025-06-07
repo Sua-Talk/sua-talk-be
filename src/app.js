@@ -13,6 +13,8 @@ const babyRoutes = require('./routes/babyRoutes');
 const audioRoutes = require('./routes/audioRoutes');
 const mlRoutes = require('./routes/mlRoutes');
 const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
+const { secureFileAccess, logFileAccess, fileDownloadRateLimit, streamFile } = require('./middleware/fileAccess');
+const { authenticate } = require('./middleware/auth');
 const jobManager = require('./jobs/jobManager');
 require('dotenv').config();
 
@@ -62,8 +64,14 @@ app.use(limiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Static file serving for uploads
-app.use('/uploads', express.static('uploads'));
+// Secure static file serving for uploads with authentication and authorization
+app.use('/uploads', 
+  fileDownloadRateLimit,
+  logFileAccess,
+  authenticate,
+  secureFileAccess,
+  streamFile
+);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
