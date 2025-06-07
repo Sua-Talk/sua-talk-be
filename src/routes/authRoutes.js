@@ -16,11 +16,22 @@ const {
   validateRefreshToken,
   validateForgotPassword,
   validateResetPassword,
-  validateChangePassword
+  validateChangePassword,
+  validateOAuthQuery
 } = require('../middleware/validation');
 
 // Import error handling middleware
 const { databaseErrorMiddleware } = require('../utils/dbErrorHandler');
+const { handleValidationErrors } = require('../middleware/errorHandler');
+
+// Import rate limiting middleware
+const {
+  loginRateLimit,
+  registrationRateLimit,
+  passwordResetRateLimit,
+  emailVerificationRateLimit,
+  oauthRateLimit
+} = require('../middleware/rateLimiting');
 
 /**
  * @route   POST /api/auth/register
@@ -28,7 +39,7 @@ const { databaseErrorMiddleware } = require('../utils/dbErrorHandler');
  * @access  Public
  * @body    { email, password, firstName, lastName, phone? }
  */
-router.post('/register', validateRegistration, authController.register);
+router.post('/register', registrationRateLimit, validateRegistration, authController.register);
 
 /**
  * @route   POST /api/auth/verify-email
@@ -36,7 +47,7 @@ router.post('/register', validateRegistration, authController.register);
  * @access  Public
  * @body    { email, code }
  */
-router.post('/verify-email', validateEmailVerification, authController.verifyEmail);
+router.post('/verify-email', emailVerificationRateLimit, validateEmailVerification, authController.verifyEmail);
 
 /**
  * @route   POST /api/auth/resend-verification
@@ -44,7 +55,7 @@ router.post('/verify-email', validateEmailVerification, authController.verifyEma
  * @access  Public
  * @body    { email }
  */
-router.post('/resend-verification', validateResendVerification, authController.resendVerificationEmail);
+router.post('/resend-verification', emailVerificationRateLimit, validateResendVerification, authController.resendVerificationEmail);
 
 /**
  * @route   POST /api/auth/login
@@ -52,7 +63,7 @@ router.post('/resend-verification', validateResendVerification, authController.r
  * @access  Public
  * @body    { email, password }
  */
-router.post('/login', validateLogin, authController.login);
+router.post('/login', loginRateLimit, validateLogin, authController.login);
 
 /**
  * @route   POST /api/auth/refresh-token
@@ -76,7 +87,7 @@ router.post('/logout', validateRefreshToken, authController.logout);
  * @access  Public
  * @body    { email }
  */
-router.post('/forgot-password', validateForgotPassword, authController.forgotPassword);
+router.post('/forgot-password', passwordResetRateLimit, validateForgotPassword, authController.forgotPassword);
 
 /**
  * @route   POST /api/auth/reset-password
@@ -84,7 +95,7 @@ router.post('/forgot-password', validateForgotPassword, authController.forgotPas
  * @access  Public
  * @body    { token, newPassword }
  */
-router.post('/reset-password', validateResetPassword, authController.resetPassword);
+router.post('/reset-password', passwordResetRateLimit, validateResetPassword, authController.resetPassword);
 
 /**
  * @route   POST /api/auth/change-password
@@ -101,14 +112,14 @@ router.post('/change-password', authenticate, validateChangePassword, authContro
  * @access  Public
  * @query   { redirect? }
  */
-router.get('/google', authController.googleAuth);
+router.get('/google', oauthRateLimit, validateOAuthQuery, handleValidationErrors, authController.googleAuth);
 
 /**
  * @route   GET /api/auth/google/callback
  * @desc    Handle Google OAuth callback
  * @access  Public
  */
-router.get('/google/callback', authController.googleCallback);
+router.get('/google/callback', oauthRateLimit, authController.googleCallback);
 
 /**
  * @route   GET /api/auth/oauth-success

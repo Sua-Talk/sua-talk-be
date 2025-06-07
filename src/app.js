@@ -20,8 +20,50 @@ require('dotenv').config();
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware with enhanced configuration
+app.use(helmet({
+  // Strict Transport Security (HSTS) - Force HTTPS in production
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  // Content Security Policy
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"]
+    }
+  },
+  // Cross-Origin Embedder Policy
+  crossOriginEmbedderPolicy: false, // Disabled for API
+  // Permissions Policy (Feature Policy)
+  permissionsPolicy: {
+    camera: [],
+    microphone: [],
+    geolocation: [],
+    payment: [],
+    usb: [],
+    bluetooth: []
+  },
+  // Additional security headers
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  xssFilter: true,
+  noSniff: true,
+  frameguard: { action: 'deny' },
+  ieNoOpen: true,
+  hidePoweredBy: true
+}));
 app.use(securityHeaders);
 app.use(mongoSanitizeMiddleware);
 

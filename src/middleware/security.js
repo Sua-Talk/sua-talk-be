@@ -54,23 +54,28 @@ const mongoSanitizeMiddleware = mongoSanitize({
 });
 
 /**
- * Additional security headers
+ * Additional security headers (complementing Helmet.js)
  */
 const securityHeaders = (req, res, next) => {
-  // Prevent MIME type sniffing
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // API-specific security headers
+  res.setHeader('X-API-Version', '1.0.0');
   
-  // Prevent clickjacking
-  res.setHeader('X-Frame-Options', 'DENY');
+  // Cache control for API responses
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   
-  // XSS protection
-  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // HTTPS enforcement header (in addition to HSTS)
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
   
-  // Referrer policy
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Cross-Origin-Resource-Policy for enhanced security
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   
-  // Content Security Policy for API
-  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none';");
+  // Server information hiding
+  res.removeHeader('X-Powered-By');
+  res.removeHeader('Server');
   
   next();
 };

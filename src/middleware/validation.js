@@ -1,4 +1,4 @@
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 
 // User Registration Validation
 const validateRegistration = [
@@ -360,6 +360,41 @@ const validateObjectId = (paramName = 'id') => {
     .withMessage(`Invalid ${paramName}: must be a valid MongoDB ObjectId`);
 };
 
+// Query parameter validation for audio recordings
+const validateAudioRecordingsQuery = [
+  query('babyId')
+    .optional()
+    .isMongoId()
+    .withMessage('Invalid babyId: must be a valid MongoDB ObjectId'),
+  
+  query('status')
+    .optional()
+    .isIn(['pending', 'processing', 'completed', 'failed'])
+    .withMessage('Status must be one of: pending, processing, completed, failed'),
+  
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer')
+    .toInt(),
+  
+  query('limit')
+    .optional()
+    .isInt({ min: 1, max: 50 })
+    .withMessage('Limit must be between 1 and 50')
+    .toInt()
+];
+
+// Query parameter validation for OAuth redirect
+const validateOAuthQuery = [
+  query('redirect')
+    .optional()
+    .isURL({ protocols: ['http', 'https'], require_protocol: true })
+    .withMessage('Redirect must be a valid URL with http or https protocol')
+    .isLength({ max: 500 })
+    .withMessage('Redirect URL cannot exceed 500 characters')
+];
+
 module.exports = {
   validateRegistration,
   validateEmailVerification,
@@ -373,5 +408,7 @@ module.exports = {
   validateDeleteAccount,
   validateCreateBaby,
   validateUpdateBaby,
-  validateObjectId
+  validateObjectId,
+  validateAudioRecordingsQuery,
+  validateOAuthQuery
 }; 

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const audioController = require('../controllers/audioController');
 const { authenticate } = require('../middleware/auth');
-const { validateObjectId } = require('../middleware/validation');
+const { validateObjectId, validateAudioRecordingsQuery } = require('../middleware/validation');
 const { handleValidationErrors } = require('../middleware/errorHandler');
 const { body } = require('express-validator');
 const { 
@@ -45,6 +45,8 @@ router.post('/upload',
 router.get('/recordings', 
   profileRateLimit, 
   authenticate, 
+  validateAudioRecordingsQuery,
+  handleValidationErrors,
   securityLogger, 
   audioController.getAllRecordings
 );
