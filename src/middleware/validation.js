@@ -116,6 +116,42 @@ const validateRefreshToken = [
     .withMessage('Refresh token is required')
 ];
 
+// Update Profile Validation
+const validateUpdateProfile = [
+  body('firstName')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('First name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('First name can only contain letters and spaces'),
+  
+  body('lastName')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Last name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Last name can only contain letters and spaces'),
+  
+  body('phone')
+    .optional()
+    .trim()
+    .matches(/^\+?[1-9]\d{1,14}$/)
+    .withMessage('Please enter a valid phone number (E.164 format)')
+];
+
+// Delete Account Validation
+const validateDeleteAccount = [
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required to delete account'),
+  
+  body('confirmDelete')
+    .equals('DELETE')
+    .withMessage('Please type "DELETE" to confirm account deletion')
+];
+
 module.exports = {
   validateRegistration,
   validateEmailVerification,
@@ -124,5 +160,7 @@ module.exports = {
   validateForgotPassword,
   validateResetPassword,
   validateChangePassword,
-  validateRefreshToken
+  validateRefreshToken,
+  validateUpdateProfile,
+  validateDeleteAccount
 }; 

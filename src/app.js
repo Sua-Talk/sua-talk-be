@@ -7,12 +7,16 @@ const { connectDB, checkDBHealth } = require('./config/database');
 const { databaseErrorMiddleware } = require('./utils/dbErrorHandler');
 const passport = require('./config/passport');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
 require('dotenv').config();
 
 const app = express();
 
 // Security middleware
 app.use(helmet());
+app.use(securityHeaders);
+app.use(mongoSanitizeMiddleware);
 
 // CORS configuration
 app.use(cors({
@@ -47,6 +51,9 @@ app.use(limiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Static file serving for uploads
+app.use('/uploads', express.static('uploads'));
+
 // Health check endpoint
 app.get('/health', async (req, res) => {
   const dbHealth = await checkDBHealth();
@@ -71,6 +78,9 @@ app.get('/api', (req, res) => {
 
 // Authentication routes
 app.use('/api/auth', authRoutes);
+
+// User routes
+app.use('/api/users', userRoutes);
 
 // Database error handling middleware
 app.use(databaseErrorMiddleware);

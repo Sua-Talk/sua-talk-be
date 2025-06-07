@@ -29,3 +29,6 @@ tasks.json
 tasks/ 
 .taskmaster/
 .cursor/
+
+# Uploads
+uploads/
