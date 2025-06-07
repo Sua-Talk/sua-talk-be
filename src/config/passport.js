@@ -8,9 +8,9 @@ const User = require('../models/User');
 // JWT Strategy for API authentication
 passport.use(new JwtStrategy({
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_SECRET,
-  issuer: 'suatalk-api',
-  audience: 'suatalk-app'
+  secretOrKey: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET,
+  issuer: process.env.JWT_ISSUER || 'suatalk-api',
+  audience: process.env.JWT_AUDIENCE || 'suatalk-app'
 }, async (payload, done) => {
   try {
     // Check if token is expired
@@ -19,7 +19,7 @@ passport.use(new JwtStrategy({
     }
 
     // Find user by ID from JWT payload
-    const user = await User.findById(payload.sub).select('-password');
+    const user = await User.findById(payload.userId || payload.sub).select('-password');
     
     if (!user) {
       return done(null, false, { message: 'User not found' });

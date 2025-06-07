@@ -1,1 +1,250 @@
-const AWS = require('aws-sdk');\nconst multer = require('multer');\nconst multerS3 = require('multer-s3');\nconst crypto = require('crypto');\nconst path = require('path');\n\n/**\n * Minio S3 Storage Configuration for CapRover\n * Using S3-compatible storage via Minio instance\n */\n\n// Configure S3 client for Minio\nconst s3Config = {\n  endpoint: process.env.MINIO_ENDPOINT || 'http://srv-captain--minio:9000',\n  accessKeyId: process.env.MINIO_ACCESS_KEY,\n  secretAccessKey: process.env.MINIO_SECRET_KEY,\n  s3ForcePathStyle: true, // Required for Minio\n  signatureVersion: 'v4',\n  region: process.env.MINIO_REGION || 'us-east-1' // Default region for Minio\n};\n\n// Create S3 instance\nconst s3 = new AWS.S3(s3Config);\n\n// Bucket configuration\nconst BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'suatalk-files';\n\n/**\n * Generate secure filename\n */\nconst generateSecureFilename = (originalName, prefix = 'file', userId = null) => {\n  const timestamp = Date.now();\n  const randomHash = crypto.randomBytes(8).toString('hex');\n  const extension = path.extname(originalName).toLowerCase();\n  \n  const userPart = userId ? `-${userId}` : '';\n  return `${prefix}${userPart}-${timestamp}-${randomHash}${extension}`;\n};\n\n/**\n * S3 Storage for Baby Photos\n */\nconst babyPhotoStorage = multerS3({\n  s3: s3,\n  bucket: BUCKET_NAME,\n  key: function (req, file, cb) {\n    const babyId = req.params.id;\n    const filename = generateSecureFilename(file.originalname, 'baby', babyId);\n    cb(null, `baby-photos/${filename}`);\n  },\n  contentType: multerS3.AUTO_CONTENT_TYPE,\n  metadata: function (req, file, cb) {\n    cb(null, {\n      fieldName: file.fieldname,\n      userId: req.user._id.toString(),\n      babyId: req.params.id || '',\n      uploadDate: new Date().toISOString()\n    });\n  }\n});\n\n/**\n * S3 Storage for Audio Recordings\n */\nconst audioStorage = multerS3({\n  s3: s3,\n  bucket: BUCKET_NAME,\n  key: function (req, file, cb) {\n    const userId = req.user._id;\n    const filename = generateSecureFilename(file.originalname, 'audio', userId);\n    cb(null, `audio-recordings/${filename}`);\n  },\n  contentType: multerS3.AUTO_CONTENT_TYPE,\n  metadata: function (req, file, cb) {\n    cb(null, {\n      fieldName: file.fieldname,\n      userId: req.user._id.toString(),\n      uploadDate: new Date().toISOString()\n    });\n  }\n});\n\n/**\n * S3 Storage for User Avatars\n */\nconst avatarStorage = multerS3({\n  s3: s3,\n  bucket: BUCKET_NAME,\n  key: function (req, file, cb) {\n    const userId = req.user._id;\n    const filename = generateSecureFilename(file.originalname, 'avatar', userId);\n    cb(null, `avatars/${filename}`);\n  },\n  contentType: multerS3.AUTO_CONTENT_TYPE,\n  metadata: function (req, file, cb) {\n    cb(null, {\n      fieldName: file.fieldname,\n      userId: req.user._id.toString(),\n      uploadDate: new Date().toISOString()\n    });\n  }\n});\n\n/**\n * File filter for images\n */\nconst imageFileFilter = (req, file, cb) => {\n  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];\n  \n  if (allowedTypes.includes(file.mimetype)) {\n    cb(null, true);\n  } else {\n    cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);\n  }\n};\n\n/**\n * File filter for audio\n */\nconst audioFileFilter = (req, file, cb) => {\n  const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/flac'];\n  \n  if (allowedTypes.includes(file.mimetype)) {\n    cb(null, true);\n  } else {\n    cb(new Error('Invalid audio type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);\n  }\n};\n\n/**\n * Multer configurations\n */\nconst photoUpload = multer({\n  storage: babyPhotoStorage,\n  fileFilter: imageFileFilter,\n  limits: {\n    fileSize: 5 * 1024 * 1024, // 5MB limit\n    files: 1\n  }\n});\n\nconst audioUpload = multer({\n  storage: audioStorage,\n  fileFilter: audioFileFilter,\n  limits: {\n    fileSize: 50 * 1024 * 1024, // 50MB limit\n    files: 1\n  }\n});\n\nconst avatarUpload = multer({\n  storage: avatarStorage,\n  fileFilter: imageFileFilter,\n  limits: {\n    fileSize: 5 * 1024 * 1024, // 5MB limit\n    files: 1\n  }\n});\n\n/**\n * Utility functions\n */\nconst createBucketIfNotExists = async () => {\n  try {\n    await s3.headBucket({ Bucket: BUCKET_NAME }).promise();\n    console.log(`✅ Bucket ${BUCKET_NAME} exists`);\n  } catch (error) {\n    if (error.statusCode === 404) {\n      try {\n        await s3.createBucket({ Bucket: BUCKET_NAME }).promise();\n        console.log(`✅ Bucket ${BUCKET_NAME} created successfully`);\n      } catch (createError) {\n        console.error(`❌ Failed to create bucket ${BUCKET_NAME}:`, createError);\n        throw createError;\n      }\n    } else {\n      console.error(`❌ Error checking bucket ${BUCKET_NAME}:`, error);\n      throw error;\n    }\n  }\n};\n\nconst deleteFile = async (key) => {\n  try {\n    await s3.deleteObject({ Bucket: BUCKET_NAME, Key: key }).promise();\n    console.log(`✅ File deleted: ${key}`);\n    return { success: true };\n  } catch (error) {\n    console.error(`❌ Error deleting file ${key}:`, error);\n    return { success: false, error: error.message };\n  }\n};\n\nconst getFileUrl = (key, expiresIn = 3600) => {\n  try {\n    // For Minio with CapRover internal networking, generate signed URL\n    const url = s3.getSignedUrl('getObject', {\n      Bucket: BUCKET_NAME,\n      Key: key,\n      Expires: expiresIn\n    });\n    return url;\n  } catch (error) {\n    console.error(`❌ Error generating file URL for ${key}:`, error);\n    return null;\n  }\n};\n\nconst getStorageStats = async () => {\n  try {\n    // List objects in bucket with prefixes\n    const prefixes = ['baby-photos/', 'audio-recordings/', 'avatars/'];\n    const stats = {};\n    \n    for (const prefix of prefixes) {\n      const data = await s3.listObjectsV2({\n        Bucket: BUCKET_NAME,\n        Prefix: prefix\n      }).promise();\n      \n      const fileCount = data.Contents.length;\n      const totalSize = data.Contents.reduce((sum, obj) => sum + obj.Size, 0);\n      \n      stats[prefix.replace('/', '')] = {\n        fileCount,\n        totalSize,\n        totalSizeMB: Math.round(totalSize / (1024 * 1024) * 100) / 100\n      };\n    }\n    \n    return { success: true, stats };\n  } catch (error) {\n    return { success: false, error: error.message };\n  }\n};\n\nmodule.exports = {\n  s3,\n  BUCKET_NAME,\n  photoUpload,\n  audioUpload,\n  avatarUpload,\n  createBucketIfNotExists,\n  deleteFile,\n  getFileUrl,\n  getStorageStats,\n  uploadBabyPhoto: photoUpload.single('photo'),\n  uploadAudioRecording: audioUpload.single('audio'),\n  uploadAvatar: avatarUpload.single('avatar')\n}; 
+const AWS = require('aws-sdk');
+const multer = require('multer');
+const multerS3 = require('multer-s3');
+const crypto = require('crypto');
+const path = require('path');
+
+/**
+ * Minio S3 Storage Configuration for CapRover
+ * Using S3-compatible storage via Minio instance
+ */
+
+// Configure S3 client for Minio
+const s3Config = {
+  endpoint: process.env.MINIO_ENDPOINT || 'http://srv-captain--minio:9000',
+  accessKeyId: process.env.MINIO_ACCESS_KEY,
+  secretAccessKey: process.env.MINIO_SECRET_KEY,
+  s3ForcePathStyle: true, // Required for Minio
+  signatureVersion: 'v4',
+  region: process.env.MINIO_REGION || 'us-east-1' // Default region for Minio
+};
+
+// Create S3 instance
+const s3 = new AWS.S3(s3Config);
+
+// Bucket configuration
+const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'suatalk-files';
+
+/**
+ * Generate secure filename
+ */
+const generateSecureFilename = (originalName, prefix = 'file', userId = null) => {
+  const timestamp = Date.now();
+  const randomHash = crypto.randomBytes(8).toString('hex');
+  const extension = path.extname(originalName).toLowerCase();
+  
+  const userPart = userId ? `-${userId}` : '';
+  return `${prefix}${userPart}-${timestamp}-${randomHash}${extension}`;
+};
+
+/**
+ * S3 Storage for Baby Photos
+ */
+const babyPhotoStorage = multerS3({
+  s3: s3,
+  bucket: BUCKET_NAME,
+  key: function (req, file, cb) {
+    const babyId = req.params.id;
+    const filename = generateSecureFilename(file.originalname, 'baby', babyId);
+    cb(null, `baby-photos/${filename}`);
+  },
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: function (req, file, cb) {
+    cb(null, {
+      fieldName: file.fieldname,
+      userId: req.user._id.toString(),
+      babyId: req.params.id || '',
+      uploadDate: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * S3 Storage for Audio Recordings
+ */
+const audioStorage = multerS3({
+  s3: s3,
+  bucket: BUCKET_NAME,
+  key: function (req, file, cb) {
+    const userId = req.user._id;
+    const filename = generateSecureFilename(file.originalname, 'audio', userId);
+    cb(null, `audio-recordings/${filename}`);
+  },
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: function (req, file, cb) {
+    cb(null, {
+      fieldName: file.fieldname,
+      userId: req.user._id.toString(),
+      uploadDate: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * S3 Storage for User Avatars
+ */
+const avatarStorage = multerS3({
+  s3: s3,
+  bucket: BUCKET_NAME,
+  key: function (req, file, cb) {
+    const userId = req.user._id;
+    const filename = generateSecureFilename(file.originalname, 'avatar', userId);
+    cb(null, `avatars/${filename}`);
+  },
+  contentType: multerS3.AUTO_CONTENT_TYPE,
+  metadata: function (req, file, cb) {
+    cb(null, {
+      fieldName: file.fieldname,
+      userId: req.user._id.toString(),
+      uploadDate: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * File filter for images
+ */
+const imageFileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, PNG, and WebP images are allowed.'), false);
+  }
+};
+
+/**
+ * File filter for audio
+ */
+const audioFileFilter = (req, file, cb) => {
+  const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/flac'];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid audio type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);
+  }
+};
+
+/**
+ * Multer configurations
+ */
+const photoUpload = multer({
+  storage: babyPhotoStorage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1
+  }
+});
+
+const audioUpload = multer({
+  storage: audioStorage,
+  fileFilter: audioFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1
+  }
+});
+
+const avatarUpload = multer({
+  storage: avatarStorage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1
+  }
+});
+
+/**
+ * Utility functions
+ */
+const createBucketIfNotExists = async () => {
+  try {
+    await s3.headBucket({ Bucket: BUCKET_NAME }).promise();
+    console.log(`✅ Bucket ${BUCKET_NAME} exists`);
+  } catch (error) {
+    if (error.statusCode === 404) {
+      try {
+        await s3.createBucket({ Bucket: BUCKET_NAME }).promise();
+        console.log(`✅ Bucket ${BUCKET_NAME} created successfully`);
+      } catch (createError) {
+        console.error(`❌ Failed to create bucket ${BUCKET_NAME}:`, createError);
+        throw createError;
+      }
+    } else {
+      console.error(`❌ Error checking bucket ${BUCKET_NAME}:`, error);
+      throw error;
+    }
+  }
+};
+
+const deleteFile = async (key) => {
+  try {
+    await s3.deleteObject({ Bucket: BUCKET_NAME, Key: key }).promise();
+    console.log(`✅ File deleted: ${key}`);
+    return { success: true };
+  } catch (error) {
+    console.error(`❌ Error deleting file ${key}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+const getFileUrl = (key, expiresIn = 3600) => {
+  try {
+    // For Minio with CapRover internal networking, generate signed URL
+    const url = s3.getSignedUrl('getObject', {
+      Bucket: BUCKET_NAME,
+      Key: key,
+      Expires: expiresIn
+    });
+    return url;
+  } catch (error) {
+    console.error(`❌ Error generating file URL for ${key}:`, error);
+    return null;
+  }
+};
+
+const getStorageStats = async () => {
+  try {
+    // List objects in bucket with prefixes
+    const prefixes = ['baby-photos/', 'audio-recordings/', 'avatars/'];
+    const stats = {};
+    
+    for (const prefix of prefixes) {
+      const data = await s3.listObjectsV2({
+        Bucket: BUCKET_NAME,
+        Prefix: prefix
+      }).promise();
+      
+      const fileCount = data.Contents.length;
+      const totalSize = data.Contents.reduce((sum, obj) => sum + obj.Size, 0);
+      
+      stats[prefix.replace('/', '')] = {
+        fileCount,
+        totalSize,
+        totalSizeMB: Math.round(totalSize / (1024 * 1024) * 100) / 100
+      };
+    }
+    
+    return { success: true, stats };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+module.exports = {
+  s3,
+  BUCKET_NAME,
+  photoUpload,
+  audioUpload,
+  avatarUpload,
+  createBucketIfNotExists,
+  deleteFile,
+  getFileUrl,
+  getStorageStats,
+  uploadBabyPhoto: photoUpload.single('photo'),
+  uploadAudioRecording: audioUpload.single('audio'),
+  uploadAvatar: avatarUpload.single('avatar')
+}; 

@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'sua-talk-api',
       script: './src/app.js',
-      instances: 'max', // Use all CPU cores
+      instances: 'max', 
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'development',
