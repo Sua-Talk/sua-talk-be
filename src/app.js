@@ -23,9 +23,15 @@ app.use(helmet());
 app.use(securityHeaders);
 app.use(mongoSanitizeMiddleware);
 
-// CORS configuration
+// CORS configuration for subdomain API
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'https://suatalk.site',
+    'https://www.suatalk.site',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ],
   credentials: true
 }));
 
@@ -74,29 +80,37 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// Basic API routes
-app.get('/api', (req, res) => {
+// Basic API root endpoint
+app.get('/', (req, res) => {
   res.json({
     message: 'SuaTalk Backend API',
     version: '1.0.0',
-    status: 'running'
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      auth: '/auth',
+      users: '/users',
+      babies: '/babies',
+      audio: '/audio',
+      ml: '/ml'
+    }
   });
 });
 
 // Authentication routes
-app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 
 // User routes
-app.use('/api/users', userRoutes);
+app.use('/users', userRoutes);
 
 // Baby routes
-app.use('/api/babies', babyRoutes);
+app.use('/babies', babyRoutes);
 
 // Audio routes
-app.use('/api/audio', audioRoutes);
+app.use('/audio', audioRoutes);
 
 // ML routes
-app.use('/api/ml', mlRoutes);
+app.use('/ml', mlRoutes);
 
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
@@ -120,7 +134,7 @@ if (require.main === module) {
       console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
+      console.log(`🔐 Auth endpoints: http://localhost:${PORT}/auth`);
       console.log(`🤖 Background jobs: enabled`);
     });
 

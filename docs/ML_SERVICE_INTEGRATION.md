@@ -122,37 +122,37 @@ ML_SERVICE_URL=http://srv-captain--ml:5000
 
 #### 1. Check ML Service Status
 ```http
-GET /api/ml/status
+GET https://api.suatalk.site/ml/status
 Authorization: Bearer <jwt-token>
 ```
 
 #### 2. Get Available Classes
 ```http
-GET /api/ml/classes
+GET https://api.suatalk.site/ml/classes
 Authorization: Bearer <jwt-token>
 ```
 
 #### 3. Trigger ML Analysis
 ```http
-POST /api/ml/analyze/:recordingId
+POST https://api.suatalk.site/ml/analyze/:recordingId
 Authorization: Bearer <jwt-token>
 ```
 
 #### 4. Get Analysis Result
 ```http
-GET /api/ml/analysis/:recordingId
+GET https://api.suatalk.site/ml/analysis/:recordingId
 Authorization: Bearer <jwt-token>
 ```
 
 #### 5. Get Analysis History
 ```http
-GET /api/ml/history/:userId?page=1&limit=10&status=completed&prediction=hungry
+GET https://api.suatalk.site/ml/history/:userId?page=1&limit=10&status=completed&prediction=hungry
 Authorization: Bearer <jwt-token>
 ```
 
 #### 6. Get Analysis Statistics
 ```http
-GET /api/ml/stats/:userId
+GET https://api.suatalk.site/ml/stats/:userId
 Authorization: Bearer <jwt-token>
 ```
 
@@ -162,7 +162,7 @@ Audio recordings automatically trigger ML analysis after successful upload:
 
 ```javascript
 // Upload audio - analysis is queued automatically
-POST /api/audio/upload
+POST https://api.suatalk.site/audio/upload
 // Response includes analysis queue status:
 {
   "success": true,
@@ -280,7 +280,7 @@ tests/
 ## Monitoring
 
 ### Health Checks
-- `/api/ml/status` - Comprehensive ML service status
+- `https://api.suatalk.site/ml/status` - Comprehensive ML service status
 - Application logs include ML service availability
 - Job manager reports queue status and failures
 
