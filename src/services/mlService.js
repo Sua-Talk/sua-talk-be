@@ -20,7 +20,7 @@ const CIRCUIT_STATES = {
 class MLService {
   constructor() {
     // Environment-based URL configuration
-    this.baseURL = process.env.ML_SERVICE_URL || 'http://localhost:5000';
+    this.baseURL = process.env.ML_SERVICE_URL;
     
     // Circuit breaker configuration
     this.circuitBreaker = {
