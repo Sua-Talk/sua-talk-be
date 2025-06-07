@@ -11,7 +11,9 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const babyRoutes = require('./routes/babyRoutes');
 const audioRoutes = require('./routes/audioRoutes');
+const mlRoutes = require('./routes/mlRoutes');
 const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
+const jobManager = require('./jobs/jobManager');
 require('dotenv').config();
 
 const app = express();
@@ -60,13 +62,15 @@ app.use('/uploads', express.static('uploads'));
 // Health check endpoint
 app.get('/health', async (req, res) => {
   const dbHealth = await checkDBHealth();
+  const jobStats = await jobManager.getJobStats();
   
   res.json({
     status: dbHealth.state ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     version: process.env.npm_package_version || '1.0.0',
-    database: dbHealth
+    database: dbHealth,
+    jobs: jobStats
   });
 });
 
@@ -91,6 +95,9 @@ app.use('/api/babies', babyRoutes);
 // Audio routes
 app.use('/api/audio', audioRoutes);
 
+// ML routes
+app.use('/api/ml', mlRoutes);
+
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
 
@@ -104,13 +111,32 @@ const PORT = process.env.PORT || 3000;
 
 if (require.main === module) {
   // Initialize database connection before starting server
-  connectDB().then(() => {
+  connectDB().then(async () => {
+    // Initialize job manager
+    await jobManager.initialize();
+    await jobManager.scheduleCleanupJob();
+    
     app.listen(PORT, () => {
       console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
+      console.log(`🤖 Background jobs: enabled`);
     });
+
+    // Graceful shutdown handling
+    process.on('SIGTERM', async () => {
+      console.log('🛑 Received SIGTERM, shutting down gracefully...');
+      await jobManager.shutdown();
+      process.exit(0);
+    });
+
+    process.on('SIGINT', async () => {
+      console.log('🛑 Received SIGINT, shutting down gracefully...');
+      await jobManager.shutdown();
+      process.exit(0);
+    });
+
   }).catch((error) => {
     console.error('❌ Failed to start server:', error);
     process.exit(1);

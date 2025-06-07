@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { sendSuccessResponse, sendErrorResponse, asyncHandler } = require('../middleware/errorHandler');
 const { audioRecordingsDir } = require('../middleware/upload');
+const jobManager = require('../jobs/jobManager');
 
 /**
  * Upload audio recording for a baby
@@ -91,6 +92,21 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     const audioRecording = new AudioRecording(audioData);
     const savedRecording = await audioRecording.save();
 
+    // Trigger automatic ML analysis (background job)
+    let analysisQueued = false;
+    let queuedAt = null;
+    
+    try {
+      await jobManager.scheduleAudioAnalysis(savedRecording._id.toString());
+      analysisQueued = true;
+      queuedAt = new Date().toISOString();
+      console.log(`🤖 ML analysis automatically queued for recording: ${savedRecording._id}`);
+    } catch (analysisError) {
+      console.error('Failed to queue automatic ML analysis:', analysisError);
+      // Don't fail the upload if analysis queuing fails
+      // The analysis can be triggered manually later
+    }
+
     // Format response data
     const responseData = {
       id: savedRecording._id,
@@ -106,10 +122,20 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       analysisStatus: savedRecording.analysisStatus,
       recordingContext: savedRecording.recordingContext,
       uploadedAt: savedRecording.analysisMetadata.uploadedAt,
-      createdAt: savedRecording.createdAt
+      createdAt: savedRecording.createdAt,
+      // ML analysis info
+      analysis: {
+        queued: analysisQueued,
+        queuedAt: queuedAt,
+        status: savedRecording.analysisStatus
+      }
     };
 
-    return sendSuccessResponse(res, 201, 'Audio recording uploaded successfully', {
+    const message = analysisQueued 
+      ? 'Audio recording uploaded and ML analysis queued successfully'
+      : 'Audio recording uploaded successfully (ML analysis can be triggered manually)';
+
+    return sendSuccessResponse(res, 201, message, {
       recording: responseData
     });
 
@@ -187,10 +213,16 @@ const getAllRecordings = asyncHandler(async (req, res) => {
       birthDate: recording.babyId.birthDate
     } : null,
     analysisStatus: recording.analysisStatus,
-    emotionResult: recording.emotionResult,
+    // Include ML analysis results if completed
+    mlAnalysis: recording.analysisStatus === 'completed' && recording.mlAnalysis ? {
+      prediction: recording.mlAnalysis.prediction,
+      confidence: recording.mlAnalysis.confidence,
+      allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map())
+    } : null,
     recordingContext: recording.recordingContext,
     uploadedAt: recording.analysisMetadata.uploadedAt,
     analyzedAt: recording.analysisMetadata.analyzedAt,
+    retryCount: recording.analysisMetadata?.retryCount || 0,
     createdAt: recording.createdAt
   }));
 
@@ -249,17 +281,204 @@ const getRecordingById = asyncHandler(async (req, res) => {
       birthDate: recording.babyId.birthDate
     } : null,
     analysisStatus: recording.analysisStatus,
-    emotionResult: recording.emotionResult,
+    // Include complete ML analysis results if available
+    mlAnalysis: recording.analysisStatus === 'completed' && recording.mlAnalysis ? {
+      prediction: recording.mlAnalysis.prediction,
+      confidence: recording.mlAnalysis.confidence,
+      allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map()),
+      featureShape: recording.mlAnalysis.featureShape
+    } : null,
     audioMetadata: recording.audioMetadata,
     recordingContext: recording.recordingContext,
     analysisMetadata: recording.analysisMetadata,
-    mlServiceResponse: recording.mlServiceResponse,
+    mlServiceResponse: {
+      processingTime: recording.mlServiceResponse?.processingTime,
+      error: recording.mlServiceResponse?.error
+    },
     createdAt: recording.createdAt,
     updatedAt: recording.updatedAt
   };
 
   return sendSuccessResponse(res, 200, 'Audio recording retrieved successfully', {
     recording: responseData
+  });
+});
+
+/**
+ * Get pending ML analysis recordings for user
+ * @route GET /api/audio/pending-analysis
+ * @access Private
+ */
+const getPendingAnalysisRecordings = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  // Check if account is active
+  if (!req.user.isActive) {
+    return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
+  }
+
+  // Find recordings with pending or failed analysis (that can be retried)
+  const pendingRecordings = await AudioRecording.find({ 
+    userId, 
+    isActive: true,
+    $or: [
+      { analysisStatus: 'pending' },
+      { 
+        analysisStatus: 'failed',
+        'analysisMetadata.retryCount': { $lt: 3 }
+      }
+    ]
+  })
+  .populate('babyId', 'name birthDate')
+  .sort({ createdAt: -1 })
+  .limit(50); // Limit to 50 most recent
+
+  // Format response data
+  const responseData = pendingRecordings.map(recording => ({
+    id: recording._id,
+    filename: recording.filename,
+    originalName: recording.originalName,
+    baby: recording.babyId ? {
+      id: recording.babyId._id,
+      name: recording.babyId.name
+    } : null,
+    analysisStatus: recording.analysisStatus,
+    retryCount: recording.analysisMetadata?.retryCount || 0,
+    uploadedAt: recording.analysisMetadata.uploadedAt,
+    lastRetryAt: recording.analysisMetadata.lastRetryAt,
+    canRetry: recording.canRetryAnalysis(),
+    createdAt: recording.createdAt
+  }));
+
+  return sendSuccessResponse(res, 200, 'Pending analysis recordings retrieved successfully', {
+    recordings: responseData,
+    totalCount: responseData.length
+  });
+});
+
+/**
+ * Trigger ML analysis for multiple recordings
+ * @route POST /api/audio/batch-analyze
+ * @access Private
+ */
+const batchTriggerAnalysis = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { recordingIds, analyzeAllPending = false } = req.body;
+
+  // Check if account is active
+  if (!req.user.isActive) {
+    return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
+  }
+
+  let targetRecordings = [];
+
+  if (analyzeAllPending) {
+    // Get all pending recordings for user
+    targetRecordings = await AudioRecording.find({ 
+      userId, 
+      isActive: true,
+      $or: [
+        { analysisStatus: 'pending' },
+        { 
+          analysisStatus: 'failed',
+          'analysisMetadata.retryCount': { $lt: 3 }
+        }
+      ]
+    }).limit(20); // Limit to 20 recordings for safety
+  } else if (recordingIds && Array.isArray(recordingIds)) {
+    // Get specific recordings
+    targetRecordings = await AudioRecording.find({
+      _id: { $in: recordingIds },
+      userId,
+      isActive: true
+    });
+  } else {
+    return sendErrorResponse(res, 400, 'Either recordingIds array or analyzeAllPending flag is required', 'INVALID_REQUEST');
+  }
+
+  if (targetRecordings.length === 0) {
+    return sendErrorResponse(res, 404, 'No eligible recordings found for analysis', 'NO_RECORDINGS_FOUND');
+  }
+
+  // Track results
+  const results = {
+    total: targetRecordings.length,
+    queued: 0,
+    skipped: 0,
+    failed: 0,
+    details: []
+  };
+
+  // Process each recording
+  for (const recording of targetRecordings) {
+    try {
+      // Check if recording can be analyzed
+      if (recording.analysisStatus === 'completed') {
+        results.skipped++;
+        results.details.push({
+          recordingId: recording._id,
+          filename: recording.filename,
+          status: 'skipped',
+          reason: 'Already completed'
+        });
+        continue;
+      }
+
+      if (recording.analysisStatus === 'processing') {
+        results.skipped++;
+        results.details.push({
+          recordingId: recording._id,
+          filename: recording.filename,
+          status: 'skipped',
+          reason: 'Currently processing'
+        });
+        continue;
+      }
+
+      if (recording.analysisStatus === 'failed' && !recording.canRetryAnalysis()) {
+        results.skipped++;
+        results.details.push({
+          recordingId: recording._id,
+          filename: recording.filename,
+          status: 'skipped',
+          reason: 'Exceeded retry limit'
+        });
+        continue;
+      }
+
+      // Queue analysis
+      await jobManager.scheduleAudioAnalysis(recording._id.toString());
+      
+      // Update status if it was failed
+      if (recording.analysisStatus === 'failed') {
+        recording.analysisStatus = 'pending';
+        await recording.save();
+      }
+
+      results.queued++;
+      results.details.push({
+        recordingId: recording._id,
+        filename: recording.filename,
+        status: 'queued',
+        queuedAt: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error(`Failed to queue analysis for recording ${recording._id}:`, error);
+      results.failed++;
+      results.details.push({
+        recordingId: recording._id,
+        filename: recording.filename,
+        status: 'failed',
+        error: error.message
+      });
+    }
+  }
+
+  const message = `Batch analysis processing completed: ${results.queued} queued, ${results.skipped} skipped, ${results.failed} failed`;
+
+  return sendSuccessResponse(res, 200, message, {
+    results
   });
 });
 
@@ -398,6 +617,8 @@ module.exports = {
   uploadAudioRecording,
   getAllRecordings,
   getRecordingById,
+  getPendingAnalysisRecordings,
+  batchTriggerAnalysis,
   deleteRecording,
   cleanupAudioFiles
 }; 

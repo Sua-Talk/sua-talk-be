@@ -6,6 +6,7 @@ const fs = require('fs');
 const uploadsDir = path.join(__dirname, '../../uploads');
 const babyPhotosDir = path.join(uploadsDir, 'baby-photos');
 const audioRecordingsDir = path.join(uploadsDir, 'audio-recordings');
+const avatarsDir = path.join(uploadsDir, 'avatars');
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -17,6 +18,10 @@ if (!fs.existsSync(babyPhotosDir)) {
 
 if (!fs.existsSync(audioRecordingsDir)) {
   fs.mkdirSync(audioRecordingsDir, { recursive: true });
+}
+
+if (!fs.existsSync(avatarsDir)) {
+  fs.mkdirSync(avatarsDir, { recursive: true });
 }
 
 // Configure multer storage for baby photos
@@ -46,6 +51,21 @@ const audioStorage = multer.diskStorage({
     const randomSuffix = Math.random().toString(36).substring(7);
     const extension = path.extname(file.originalname).toLowerCase();
     const filename = `audio-${userId}-${timestamp}-${randomSuffix}${extension}`;
+    cb(null, filename);
+  }
+});
+
+// Configure multer storage for user avatars
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, avatarsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename: avatar-{userId}-{timestamp}.{extension}
+    const userId = req.user._id;
+    const timestamp = Date.now();
+    const extension = path.extname(file.originalname).toLowerCase();
+    const filename = `avatar-${userId}-${timestamp}${extension}`;
     cb(null, filename);
   }
 });
@@ -116,11 +136,24 @@ const audioUpload = multer({
   }
 });
 
+// Configure multer for user avatars
+const avatarUpload = multer({
+  storage: avatarStorage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+    files: 1 // Only one file at a time
+  }
+});
+
 // Middleware for single photo upload
 const uploadBabyPhoto = photoUpload.single('photo');
 
 // Middleware for single audio upload
 const uploadAudioRecording = audioUpload.single('audio');
+
+// Middleware for single avatar upload
+const uploadAvatar = avatarUpload.single('avatar');
 
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {
@@ -194,10 +227,12 @@ const getExtensionFromMimetype = (mimetype) => {
 module.exports = {
   uploadBabyPhoto,
   uploadAudioRecording,
+  uploadAvatar,
   handleUploadError,
   uploadsDir,
   babyPhotosDir,
   audioRecordingsDir,
+  avatarsDir,
   generateAudioFilename,
   getExtensionFromMimetype
 }; 

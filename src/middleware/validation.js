@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, param } = require('express-validator');
 
 // User Registration Validation
 const validateRegistration = [
@@ -353,6 +353,13 @@ const validateUpdateBaby = [
     .withMessage('Medication frequency cannot exceed 50 characters')
 ];
 
+// MongoDB ObjectId validation function
+const validateObjectId = (paramName = 'id') => {
+  return param(paramName)
+    .isMongoId()
+    .withMessage(`Invalid ${paramName}: must be a valid MongoDB ObjectId`);
+};
+
 module.exports = {
   validateRegistration,
   validateEmailVerification,
@@ -365,5 +372,6 @@ module.exports = {
   validateUpdateProfile,
   validateDeleteAccount,
   validateCreateBaby,
-  validateUpdateBaby
+  validateUpdateBaby,
+  validateObjectId
 }; 

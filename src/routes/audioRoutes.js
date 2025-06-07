@@ -4,6 +4,7 @@ const audioController = require('../controllers/audioController');
 const { authenticate } = require('../middleware/auth');
 const { validateObjectId } = require('../middleware/validation');
 const { handleValidationErrors } = require('../middleware/errorHandler');
+const { body } = require('express-validator');
 const { 
   profileRateLimit, 
   profileUpdateRateLimit 
@@ -74,6 +75,49 @@ router.delete('/recordings/:id',
   handleValidationErrors,
   securityLogger, 
   audioController.deleteRecording
+);
+
+/**
+ * @route GET /api/audio/pending-analysis
+ * @desc Get pending ML analysis recordings for user
+ * @access Private
+ */
+router.get('/pending-analysis', 
+  profileRateLimit, 
+  authenticate, 
+  securityLogger, 
+  audioController.getPendingAnalysisRecordings
+);
+
+/**
+ * @route POST /api/audio/batch-analyze
+ * @desc Trigger ML analysis for multiple recordings
+ * @access Private
+ * @body recordingIds - Array of recording IDs to analyze (optional)
+ * @body analyzeAllPending - Boolean to analyze all pending recordings (optional)
+ */
+router.post('/batch-analyze', 
+  profileUpdateRateLimit, 
+  authenticate,
+  [
+    body('recordingIds')
+      .optional()
+      .isArray()
+      .withMessage('recordingIds must be an array')
+      .custom((recordingIds) => {
+        if (recordingIds && recordingIds.length > 20) {
+          throw new Error('Cannot analyze more than 20 recordings at once');
+        }
+        return true;
+      }),
+    body('analyzeAllPending')
+      .optional()
+      .isBoolean()
+      .withMessage('analyzeAllPending must be a boolean value')
+  ],
+  handleValidationErrors,
+  securityLogger, 
+  audioController.batchTriggerAnalysis
 );
 
 /**

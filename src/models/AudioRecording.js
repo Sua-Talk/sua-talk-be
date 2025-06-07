@@ -53,7 +53,8 @@ const audioRecordingSchema = new mongoose.Schema({
     enum: ['pending', 'processing', 'completed', 'failed'],
     default: 'pending'
   },
-  emotionResult: {
+  // ML Analysis Results (matching actual ML service response format)
+  mlAnalysis: {
     prediction: {
       type: String,
       enum: ['burping', 'discomfort', 'belly_pain', 'hungry', 'tired'],
@@ -65,24 +66,20 @@ const audioRecordingSchema = new mongoose.Schema({
       max: 1,
       default: null
     },
-    allPredictions: [{
-      emotion: {
-        type: String,
-        enum: ['burping', 'discomfort', 'belly_pain', 'hungry', 'tired']
-      },
-      confidence: {
-        type: Number,
-        min: 0,
-        max: 1
-      }
-    }]
+    allPredictions: {
+      type: Map,
+      of: Number,
+      default: null
+    },
+    featureShape: [Number] // e.g., [1, 167]
   },
   // ML Service metadata
   mlServiceResponse: {
     modelVersion: String,
     processingTime: Number, // in milliseconds
     requestId: String,
-    error: String
+    error: String,
+    rawResponse: mongoose.Schema.Types.Mixed // Store full ML service response
   },
   // Audio metadata
   audioMetadata: {
@@ -153,7 +150,7 @@ const audioRecordingSchema = new mongoose.Schema({
 audioRecordingSchema.index({ userId: 1, createdAt: -1 });
 audioRecordingSchema.index({ babyId: 1, createdAt: -1 });
 audioRecordingSchema.index({ analysisStatus: 1 });
-audioRecordingSchema.index({ 'emotionResult.prediction': 1 });
+audioRecordingSchema.index({ 'mlAnalysis.prediction': 1 });
 audioRecordingSchema.index({ createdAt: -1 });
 
 // Compound indexes
@@ -207,10 +204,10 @@ audioRecordingSchema.statics.findPendingAnalysis = function() {
   }).sort({ createdAt: 1 });
 };
 
-// Static method to find by emotion
-audioRecordingSchema.statics.findByEmotion = function(emotion, userId, limit = 20) {
+// Static method to find by emotion/prediction
+audioRecordingSchema.statics.findByPrediction = function(prediction, userId, limit = 20) {
   return this.find({ 
-    'emotionResult.prediction': emotion,
+    'mlAnalysis.prediction': prediction,
     userId,
     isActive: true 
   })
@@ -219,11 +216,32 @@ audioRecordingSchema.statics.findByEmotion = function(emotion, userId, limit = 2
     .limit(limit);
 };
 
-// Instance method to update analysis result
-audioRecordingSchema.methods.updateAnalysisResult = function(result) {
+// Static method to find by analysis status
+audioRecordingSchema.statics.findByAnalysisStatus = function(status, limit = 50) {
+  return this.find({ 
+    analysisStatus: status,
+    isActive: true 
+  })
+    .sort({ createdAt: 1 })
+    .limit(limit);
+};
+
+// Instance method to update ML analysis result
+audioRecordingSchema.methods.updateMLAnalysisResult = function(mlResult, processingTime = null) {
   this.analysisStatus = 'completed';
-  this.emotionResult = result;
+  this.mlAnalysis = {
+    prediction: mlResult.prediction,
+    confidence: mlResult.confidence,
+    allPredictions: new Map(Object.entries(mlResult.all_predictions || {})),
+    featureShape: mlResult.feature_shape || []
+  };
   this.analysisMetadata.analyzedAt = new Date();
+  
+  if (processingTime) {
+    this.mlServiceResponse.processingTime = processingTime;
+  }
+  this.mlServiceResponse.rawResponse = mlResult;
+  
   return this.save();
 };
 
@@ -234,6 +252,31 @@ audioRecordingSchema.methods.markAnalysisFailed = function(error) {
   this.analysisMetadata.retryCount += 1;
   this.analysisMetadata.lastRetryAt = new Date();
   return this.save();
+};
+
+// Instance method to mark analysis as processing
+audioRecordingSchema.methods.markAnalysisProcessing = function() {
+  this.analysisStatus = 'processing';
+  return this.save();
+};
+
+// Instance method to check if analysis can be retried
+audioRecordingSchema.methods.canRetryAnalysis = function() {
+  return this.analysisMetadata.retryCount < 3 && 
+         ['pending', 'failed'].includes(this.analysisStatus);
+};
+
+// Instance method to get analysis summary
+audioRecordingSchema.methods.getAnalysisSummary = function() {
+  return {
+    id: this._id,
+    filename: this.filename,
+    status: this.analysisStatus,
+    prediction: this.mlAnalysis?.prediction || null,
+    confidence: this.mlAnalysis?.confidence || null,
+    analyzedAt: this.analysisMetadata?.analyzedAt || null,
+    retryCount: this.analysisMetadata?.retryCount || 0
+  };
 };
 
 const AudioRecording = mongoose.model('AudioRecording', audioRecordingSchema);

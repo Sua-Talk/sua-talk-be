@@ -80,14 +80,15 @@ const securityHeaders = (req, res, next) => {
  */
 const securityLogger = (req, res, next) => {
   const timestamp = new Date().toISOString();
-  const userAgent = req.get('User-Agent') || 'Unknown';
+  const userAgent = (req.headers && req.headers['user-agent']) || 'Unknown';
   const userId = req.user ? req.user._id : 'Anonymous';
+  const originalUrl = req.originalUrl || req.url || 'unknown';
   
-  console.log(`[${timestamp}] ${req.method} ${req.originalUrl} - User: ${userId} - IP: ${req.ip} - UA: ${userAgent}`);
+  console.log(`[${timestamp}] ${req.method} ${originalUrl} - User: ${userId} - IP: ${req.ip} - UA: ${userAgent}`);
   
   // Log sensitive operations
-  if (req.method === 'DELETE' || req.originalUrl.includes('upload') || req.originalUrl.includes('password')) {
-    console.log(`[SECURITY] Sensitive operation: ${req.method} ${req.originalUrl} - User: ${userId} - IP: ${req.ip}`);
+  if (req.method === 'DELETE' || originalUrl.includes('upload') || originalUrl.includes('password')) {
+    console.log(`[SECURITY] Sensitive operation: ${req.method} ${originalUrl} - User: ${userId} - IP: ${req.ip}`);
   }
   
   next();

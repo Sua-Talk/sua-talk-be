@@ -261,6 +261,7 @@ const uploadBabyPhoto = asyncHandler(async (req, res) => {
     return sendErrorResponse(res, 400, 'No photo file provided', 'NO_FILE_UPLOADED');
   }
 
+  try {
     // Baby is already verified and attached by requireBabyOwnership middleware
     const baby = req.baby;
 
@@ -350,7 +351,7 @@ const uploadBabyPhoto = asyncHandler(async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
-};
+});
 
 /**
  * Delete baby photo
