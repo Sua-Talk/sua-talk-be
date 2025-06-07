@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 const helmet = require('helmet');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
@@ -12,13 +11,43 @@ const userRoutes = require('./routes/userRoutes');
 const babyRoutes = require('./routes/babyRoutes');
 const audioRoutes = require('./routes/audioRoutes');
 const mlRoutes = require('./routes/mlRoutes');
-const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
+const { 
+  mongoSanitizeMiddleware, 
+  securityHeaders, 
+  enhancedXSSProtection, 
+  advancedMongoSanitize,
+  cspViolationReporter 
+} = require('./middleware/security');
 const { secureFileAccess, logFileAccess, fileDownloadRateLimit, streamFile } = require('./middleware/fileAccess');
 const { authenticate } = require('./middleware/auth');
+const { corsMiddleware, corsErrorHandler, logCorsConfig } = require('./middleware/corsConfig');
+const {
+  httpLogger,
+  securityAuditLogger,
+  performanceLogger,
+  requestIdMiddleware,
+  authFailureLogger,
+  logStartup
+} = require('./middleware/logging');
 const jobManager = require('./jobs/jobManager');
 require('dotenv').config();
 
 const app = express();
+
+// Request ID for tracing (first middleware)
+app.use(requestIdMiddleware);
+
+// HTTP request logging
+app.use(httpLogger);
+
+// Performance monitoring
+app.use(performanceLogger);
+
+// Security audit logging
+app.use(securityAuditLogger);
+
+// Authentication failure logging
+app.use(authFailureLogger);
 
 // Security middleware with enhanced configuration
 app.use(helmet({
@@ -65,19 +94,17 @@ app.use(helmet({
   hidePoweredBy: true
 }));
 app.use(securityHeaders);
-app.use(mongoSanitizeMiddleware);
 
-// CORS configuration for subdomain API
-app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'https://suatalk.site',
-    'https://www.suatalk.site',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ],
-  credentials: true
-}));
+// Enhanced security middleware - order matters!
+app.use(advancedMongoSanitize);
+app.use(mongoSanitizeMiddleware);
+app.use(enhancedXSSProtection);
+
+// CSP violation reporting endpoint
+app.use(cspViolationReporter);
+
+// Enhanced CORS configuration
+app.use(corsMiddleware);
 
 // Session configuration (needed for OAuth flow)
 app.use(session({
@@ -162,6 +189,9 @@ app.use('/audio', audioRoutes);
 // ML routes
 app.use('/ml', mlRoutes);
 
+// CORS error handling middleware
+app.use(corsErrorHandler);
+
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
 
@@ -186,6 +216,12 @@ if (require.main === module) {
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`🔐 Auth endpoints: http://localhost:${PORT}/auth`);
       console.log(`🤖 Background jobs: enabled`);
+      
+      // Initialize logging system
+      logStartup();
+      
+      // Log CORS configuration
+      logCorsConfig();
     });
 
     // Graceful shutdown handling

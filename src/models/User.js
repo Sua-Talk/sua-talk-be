@@ -22,12 +22,12 @@ const userSchema = new mongoose.Schema({
           return false;
         }
         if (password) {
-          // At least one uppercase, one lowercase, one number
-          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password);
+          // At least one uppercase, one lowercase, one number, and one special character
+          return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password);
         }
         return true;
       },
-      message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+      message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
     }
   },
   firstName: {
