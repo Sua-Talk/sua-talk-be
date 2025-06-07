@@ -5,9 +5,11 @@ const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const { connectDB, checkDBHealth } = require('./config/database');
 const { databaseErrorMiddleware } = require('./utils/dbErrorHandler');
+const { handleApplicationError, handleNotFound } = require('./middleware/errorHandler');
 const passport = require('./config/passport');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const babyRoutes = require('./routes/babyRoutes');
 const { mongoSanitizeMiddleware, securityHeaders } = require('./middleware/security');
 require('dotenv').config();
 
@@ -82,25 +84,17 @@ app.use('/api/auth', authRoutes);
 // User routes
 app.use('/api/users', userRoutes);
 
+// Baby routes
+app.use('/api/babies', babyRoutes);
+
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
 
-// General error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Something went wrong!',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-  });
-});
+// Application error handling middleware
+app.use(handleApplicationError);
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl
-  });
-});
+// 404 handler for unmatched routes
+app.use('*', handleNotFound);
 
 const PORT = process.env.PORT || 3000;
 

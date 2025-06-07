@@ -1,5 +1,7 @@
 const passport = require('../config/passport');
 const jwtService = require('../services/jwtService');
+const Baby = require('../models/Baby');
+const { sendErrorResponse } = require('./errorHandler');
 
 /**
  * Authentication middleware using Passport JWT strategy
@@ -209,6 +211,50 @@ const authWithRequirements = (...middlewares) => {
   return [authenticate, ...middlewares];
 };
 
+/**
+ * Baby ownership middleware
+ * Ensures user can only access baby profiles they own
+ */
+const requireBabyOwnership = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return sendErrorResponse(res, 401, 'Authentication required', 'AUTHENTICATION_REQUIRED');
+    }
+
+    const babyId = req.params.id;
+    const userId = req.user._id;
+
+    if (!babyId) {
+      return sendErrorResponse(res, 400, 'Baby ID is required', 'BABY_ID_REQUIRED');
+    }
+
+    // Check if baby exists and belongs to the authenticated user
+    const baby = await Baby.findOne({ 
+      _id: babyId, 
+      parentId: userId,
+      isActive: true 
+    });
+
+    if (!baby) {
+      return sendErrorResponse(res, 404, 'Baby profile not found or you do not have access to it', 'BABY_NOT_FOUND');
+    }
+
+    // Attach baby to request object for use in controller
+    req.baby = baby;
+    next();
+
+  } catch (error) {
+    console.error('Baby ownership verification error:', error);
+    
+    // Handle invalid ObjectId
+    if (error.name === 'CastError') {
+      return sendErrorResponse(res, 400, 'Invalid baby ID format', 'INVALID_BABY_ID');
+    }
+
+    return sendErrorResponse(res, 500, 'Internal server error', 'INTERNAL_ERROR');
+  }
+};
+
 module.exports = {
   authenticate,
   optionalAuthenticate,
@@ -217,5 +263,6 @@ module.exports = {
   requireActiveAccount,
   requireOwnership,
   userBasedRateLimit,
-  authWithRequirements
+  authWithRequirements,
+  requireBabyOwnership
 }; 

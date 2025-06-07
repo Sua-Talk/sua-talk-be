@@ -152,6 +152,207 @@ const validateDeleteAccount = [
     .withMessage('Please type "DELETE" to confirm account deletion')
 ];
 
+// Baby Profile Validation
+const validateCreateBaby = [
+  body('name')
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Baby name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Baby name can only contain letters and spaces'),
+  
+  body('birthDate')
+    .isISO8601()
+    .withMessage('Please provide a valid birth date in ISO 8601 format')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const now = new Date();
+      const minDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+      
+      if (birthDate > now) {
+        throw new Error('Birth date cannot be in the future');
+      }
+      
+      if (birthDate < minDate) {
+        throw new Error('Baby cannot be older than 5 years');
+      }
+      
+      return true;
+    }),
+  
+  body('gender')
+    .isIn(['male', 'female', 'other', 'prefer-not-to-say'])
+    .withMessage('Gender must be one of: male, female, other, prefer-not-to-say'),
+  
+  body('weight.birth')
+    .optional()
+    .isFloat({ min: 500, max: 8000 })
+    .withMessage('Birth weight must be between 500g and 8000g'),
+  
+  body('weight.current')
+    .optional()
+    .isFloat({ min: 500, max: 50000 })
+    .withMessage('Current weight must be between 500g and 50kg'),
+  
+  body('height.birth')
+    .optional()
+    .isFloat({ min: 20, max: 80 })
+    .withMessage('Birth height must be between 20cm and 80cm'),
+  
+  body('height.current')
+    .optional()
+    .isFloat({ min: 20, max: 200 })
+    .withMessage('Current height must be between 20cm and 200cm'),
+  
+  body('feedingNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Feeding notes cannot exceed 500 characters'),
+  
+  body('sleepNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Sleep notes cannot exceed 500 characters'),
+  
+  body('allergies')
+    .optional()
+    .isArray()
+    .withMessage('Allergies must be an array'),
+  
+  body('allergies.*')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Each allergy description cannot exceed 100 characters'),
+  
+  body('medications')
+    .optional()
+    .isArray()
+    .withMessage('Medications must be an array'),
+  
+  body('medications.*.name')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Medication name must be between 1 and 100 characters'),
+  
+  body('medications.*.dosage')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Medication dosage cannot exceed 50 characters'),
+  
+  body('medications.*.frequency')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Medication frequency cannot exceed 50 characters')
+];
+
+// Baby Profile Update Validation (all fields optional)
+const validateUpdateBaby = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Baby name must be between 1 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Baby name can only contain letters and spaces'),
+  
+  body('birthDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Please provide a valid birth date in ISO 8601 format')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const now = new Date();
+      const minDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
+      
+      if (birthDate > now) {
+        throw new Error('Birth date cannot be in the future');
+      }
+      
+      if (birthDate < minDate) {
+        throw new Error('Baby cannot be older than 5 years');
+      }
+      
+      return true;
+    }),
+  
+  body('gender')
+    .optional()
+    .isIn(['male', 'female', 'other', 'prefer-not-to-say'])
+    .withMessage('Gender must be one of: male, female, other, prefer-not-to-say'),
+  
+  body('weight.birth')
+    .optional()
+    .isFloat({ min: 500, max: 8000 })
+    .withMessage('Birth weight must be between 500g and 8000g'),
+  
+  body('weight.current')
+    .optional()
+    .isFloat({ min: 500, max: 50000 })
+    .withMessage('Current weight must be between 500g and 50kg'),
+  
+  body('height.birth')
+    .optional()
+    .isFloat({ min: 20, max: 80 })
+    .withMessage('Birth height must be between 20cm and 80cm'),
+  
+  body('height.current')
+    .optional()
+    .isFloat({ min: 20, max: 200 })
+    .withMessage('Current height must be between 20cm and 200cm'),
+  
+  body('feedingNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Feeding notes cannot exceed 500 characters'),
+  
+  body('sleepNotes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Sleep notes cannot exceed 500 characters'),
+  
+  body('allergies')
+    .optional()
+    .isArray()
+    .withMessage('Allergies must be an array'),
+  
+  body('allergies.*')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Each allergy description cannot exceed 100 characters'),
+  
+  body('medications')
+    .optional()
+    .isArray()
+    .withMessage('Medications must be an array'),
+  
+  body('medications.*.name')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Medication name must be between 1 and 100 characters'),
+  
+  body('medications.*.dosage')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Medication dosage cannot exceed 50 characters'),
+  
+  body('medications.*.frequency')
+    .optional()
+    .trim()
+    .isLength({ max: 50 })
+    .withMessage('Medication frequency cannot exceed 50 characters')
+];
+
 module.exports = {
   validateRegistration,
   validateEmailVerification,
@@ -162,5 +363,7 @@ module.exports = {
   validateChangePassword,
   validateRefreshToken,
   validateUpdateProfile,
-  validateDeleteAccount
+  validateDeleteAccount,
+  validateCreateBaby,
+  validateUpdateBaby
 }; 

@@ -28,8 +28,18 @@ const babySchema = new mongoose.Schema({
     }
   },
   profilePicture: {
-    type: String,
-    default: null
+    thumbnail: {
+      type: String,
+      default: null
+    },
+    medium: {
+      type: String,
+      default: null
+    },
+    original: {
+      type: String,
+      default: null
+    }
   },
   parentId: {
     type: mongoose.Schema.Types.ObjectId,
