@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const { connectDB, checkDBHealth } = require('./config/database');
 const { databaseErrorMiddleware } = require('./utils/dbErrorHandler');
+const passport = require('./config/passport');
+const authRoutes = require('./routes/authRoutes');
 require('dotenv').config();
 
 const app = express();
@@ -16,6 +19,21 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
+
+// Session configuration (needed for OAuth flow)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-super-secret-session-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // true in production (HTTPS)
+    maxAge: 10 * 60 * 1000 // 10 minutes
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Rate limiting
 const limiter = rateLimit({
@@ -42,7 +60,7 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// Basic API routes (will be expanded later)
+// Basic API routes
 app.get('/api', (req, res) => {
   res.json({
     message: 'SuaTalk Backend API',
@@ -50,6 +68,9 @@ app.get('/api', (req, res) => {
     status: 'running'
   });
 });
+
+// Authentication routes
+app.use('/api/auth', authRoutes);
 
 // Database error handling middleware
 app.use(databaseErrorMiddleware);
@@ -80,6 +101,7 @@ if (require.main === module) {
       console.log(`🚀 SuaTalk Backend API running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth`);
     });
   }).catch((error) => {
     console.error('❌ Failed to start server:', error);

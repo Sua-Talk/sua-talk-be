@@ -6,6 +6,7 @@ const Token = require('../models/Token');
 const { withErrorHandling } = require('../utils/dbErrorHandler');
 const emailService = require('../services/emailService');
 const jwtService = require('../services/jwtService');
+const passport = require('passport');
 
 // User Registration
 const register = withErrorHandling(async (req, res) => {
@@ -534,6 +535,120 @@ const changePassword = withErrorHandling(async (req, res) => {
   });
 });
 
+// Google OAuth Authentication - Initiate
+const googleAuth = (req, res, next) => {
+  // Store the redirect URL in session or query parameter
+  const redirectUrl = req.query.redirect || process.env.FRONTEND_URL || 'http://localhost:3000';
+  req.session = req.session || {};
+  req.session.redirectUrl = redirectUrl;
+  
+  passport.authenticate('google', {
+    scope: ['profile', 'email']
+  })(req, res, next);
+};
+
+// Google OAuth Callback
+const googleCallback = withErrorHandling(async (req, res, next) => {
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed` 
+  }, async (err, user, info) => {
+    
+    if (err) {
+      console.error('Google OAuth Error:', err);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_error`);
+    }
+
+    if (!user) {
+      console.error('Google OAuth Failed:', info);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_failed`);
+    }
+
+    try {
+      // Generate JWT tokens for the authenticated user
+      const tokens = jwtService.generateTokenPair(user);
+
+      // Create refresh token in database
+      await Token.createRefreshToken(user._id, {
+        expirationDays: 30,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+
+      // Update last login
+      await user.updateLastLogin();
+
+      // Get redirect URL from session or use default
+      const redirectUrl = req.session?.redirectUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
+      
+      // Clear session redirect URL
+      if (req.session) {
+        delete req.session.redirectUrl;
+      }
+
+      // Create success redirect URL with tokens
+      const successUrl = new URL('/auth/oauth-success', redirectUrl);
+      successUrl.searchParams.set('access_token', tokens.accessToken);
+      successUrl.searchParams.set('refresh_token', tokens.refreshToken);
+      successUrl.searchParams.set('user_id', user._id.toString());
+
+      res.redirect(successUrl.toString());
+
+    } catch (tokenError) {
+      console.error('Token generation error during OAuth:', tokenError);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=token_error`);
+    }
+
+  })(req, res, next);
+});
+
+// OAuth Success Page (for handling tokens on frontend)
+const oauthSuccess = (req, res) => {
+  // This endpoint serves a simple HTML page that extracts tokens from URL
+  // and passes them to the frontend application
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Login Successful</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        .loading { color: #4F46E5; }
+      </style>
+    </head>
+    <body>
+      <h2 class="loading">Login successful! Redirecting...</h2>
+      <script>
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const accessToken = urlParams.get('access_token');
+          const refreshToken = urlParams.get('refresh_token');
+          const userId = urlParams.get('user_id');
+
+          if (accessToken && refreshToken) {
+            // Store tokens in localStorage
+            localStorage.setItem('access_token', accessToken);
+            localStorage.setItem('refresh_token', refreshToken);
+            localStorage.setItem('user_id', userId);
+
+            // Redirect to dashboard or home page
+            window.location.href = '/dashboard';
+          } else {
+            throw new Error('Missing tokens');
+          }
+        } catch (error) {
+          console.error('OAuth success handling error:', error);
+          window.location.href = '/login?error=oauth_processing_failed';
+        }
+      </script>
+    </body>
+    </html>
+  `;
+
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+};
+
 module.exports = {
   register,
   verifyEmail,
@@ -543,5 +658,8 @@ module.exports = {
   logout,
   forgotPassword,
   resetPassword,
-  changePassword
+  changePassword,
+  googleAuth,
+  googleCallback,
+  oauthSuccess
 }; 

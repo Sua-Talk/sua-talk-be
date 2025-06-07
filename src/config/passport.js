@@ -1,36 +1,24 @@
 const passport = require('passport');
 const JwtStrategy = require('passport-jwt').Strategy;
 const ExtractJwt = require('passport-jwt').ExtractJwt;
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
-const jwtService = require('../services/jwtService');
 
-// JWT Strategy Configuration
-const jwtOptions = {
+// JWT Strategy for API authentication
+passport.use(new JwtStrategy({
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-  secretOrKey: process.env.JWT_ACCESS_SECRET || 'your-super-secret-jwt-key',
-  passReqToCallback: true // Pass the request to the verify callback
-};
-
-// JWT Strategy
-passport.use('jwt', new JwtStrategy(jwtOptions, async (req, jwtPayload, done) => {
+  secretOrKey: process.env.JWT_SECRET,
+  issuer: 'suatalk-api',
+  audience: 'suatalk-app'
+}, async (payload, done) => {
   try {
-    // Validate JWT payload structure
-    if (!jwtPayload.userId || !jwtPayload.type) {
-      return done(null, false, { message: 'Invalid token structure' });
-    }
-
-    // Ensure this is an access token
-    if (jwtPayload.type !== 'access') {
-      return done(null, false, { message: 'Invalid token type' });
-    }
-
     // Check if token is expired
-    if (jwtPayload.exp && Date.now() >= jwtPayload.exp * 1000) {
+    if (Date.now() >= payload.exp * 1000) {
       return done(null, false, { message: 'Token expired' });
     }
 
-    // Find user by ID
-    const user = await User.findById(jwtPayload.userId);
+    // Find user by ID from JWT payload
+    const user = await User.findById(payload.sub).select('-password');
     
     if (!user) {
       return done(null, false, { message: 'User not found' });
@@ -38,31 +26,96 @@ passport.use('jwt', new JwtStrategy(jwtOptions, async (req, jwtPayload, done) =>
 
     // Check if user account is active
     if (!user.isActive) {
-      return done(null, false, { message: 'Account deactivated' });
+      return done(null, false, { message: 'Account is deactivated' });
     }
 
-    // Check if email is verified (for certain protected routes)
-    if (!user.isEmailVerified) {
-      return done(null, false, { message: 'Email not verified' });
-    }
-
-    // Attach user to request object
     return done(null, user);
-    
   } catch (error) {
-    console.error('JWT Strategy Error:', error);
     return done(error, false);
   }
 }));
 
-// Optional: Configure session serialization (not needed for JWT)
+// Google OAuth Strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback'
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    const { id: googleId, emails, displayName, photos } = profile;
+    const email = emails?.[0]?.value;
+    const profilePicture = photos?.[0]?.value;
+
+    if (!email) {
+      return done(new Error('No email provided by Google'), null);
+    }
+
+    // Check if user already exists with this Google ID
+    let user = await User.findOne({ 'oauth.google.id': googleId });
+
+    if (user) {
+      // User exists with this Google ID, return user
+      return done(null, user);
+    }
+
+    // Check if user exists with this email (account linking)
+    user = await User.findOne({ email });
+
+    if (user) {
+      // Link Google account to existing user
+      user.oauth = {
+        ...user.oauth,
+        google: {
+          id: googleId,
+          email,
+          profilePicture
+        }
+      };
+      
+      // Mark email as verified since it's verified by Google
+      user.isEmailVerified = true;
+      
+      await user.save();
+      return done(null, user);
+    }
+
+    // Create new user with Google OAuth
+    const [firstName, ...lastNameParts] = displayName.split(' ');
+    const lastName = lastNameParts.join(' ');
+
+    user = new User({
+      email,
+      firstName: firstName || 'User',
+      lastName: lastName || '',
+      isEmailVerified: true, // Google emails are pre-verified
+      oauth: {
+        google: {
+          id: googleId,
+          email,
+          profilePicture
+        }
+      },
+      // Generate a random password (won't be used for OAuth users)
+      password: Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+    });
+
+    await user.save();
+    return done(null, user);
+
+  } catch (error) {
+    return done(error, null);
+  }
+}));
+
+// Serialize user for session (used in OAuth flow)
 passport.serializeUser((user, done) => {
   done(null, user._id);
 });
 
+// Deserialize user from session
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findById(id);
+    const user = await User.findById(id).select('-password');
     done(null, user);
   } catch (error) {
     done(error, null);

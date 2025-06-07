@@ -94,6 +94,29 @@ router.post('/reset-password', validateResetPassword, authController.resetPasswo
  */
 router.post('/change-password', authenticate, validateChangePassword, authController.changePassword);
 
+// Google OAuth Routes
+/**
+ * @route   GET /api/auth/google
+ * @desc    Initiate Google OAuth authentication
+ * @access  Public
+ * @query   { redirect? }
+ */
+router.get('/google', authController.googleAuth);
+
+/**
+ * @route   GET /api/auth/google/callback
+ * @desc    Handle Google OAuth callback
+ * @access  Public
+ */
+router.get('/google/callback', authController.googleCallback);
+
+/**
+ * @route   GET /api/auth/oauth-success
+ * @desc    OAuth success page for token handling
+ * @access  Public
+ */
+router.get('/oauth-success', authController.oauthSuccess);
+
 // Apply database error handling middleware
 router.use(databaseErrorMiddleware);
 

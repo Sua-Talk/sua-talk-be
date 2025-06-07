@@ -14,12 +14,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() {
       // Password required only if no OAuth providers are set
-      return !this.googleId && !this.facebookId;
+      return !this.oauth?.google?.id
     },
     minlength: [8, 'Password must be at least 8 characters long'],
     validate: {
       validator: function(password) {
-        if (!password && (!this.googleId && !this.facebookId)) {
+        if (!password && (!this.oauth?.google?.id)) {
           return false;
         }
         if (password) {
@@ -56,12 +56,19 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // OAuth fields
-  googleId: {
-    type: String,
-    sparse: true // Allows multiple null values but ensures uniqueness for non-null values
+  // Comprehensive OAuth structure
+  oauth: {
+    google: {
+      id: {
+        type: String,
+        sparse: true
+      },
+      email: String,
+      profilePicture: String
+    },
   },
-  facebookId: {
+  // Legacy OAuth fields (keep for backward compatibility but mark as deprecated)
+  googleId: {
     type: String,
     sparse: true
   },
@@ -96,13 +103,18 @@ const userSchema = new mongoose.Schema({
 
 // Indexes for performance
 userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ googleId: 1 }, { sparse: true });
-userSchema.index({ facebookId: 1 }, { sparse: true });
+userSchema.index({ 'oauth.google.id': 1 }, { sparse: true });
+userSchema.index({ googleId: 1 }, { sparse: true }); // Keep for backward compatibility
 userSchema.index({ isActive: 1 });
 
 // Virtual field for full name
 userSchema.virtual('fullName').get(function() {
   return `${this.firstName} ${this.lastName}`;
+});
+
+// Virtual field to check if user has OAuth accounts
+userSchema.virtual('hasOAuth').get(function() {
+  return !!(this.oauth?.google?.id || this.googleId);
 });
 
 // Pre-save middleware for password hashing
