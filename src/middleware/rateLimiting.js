@@ -1,7 +1,15 @@
 const rateLimit = require('express-rate-limit');
 
+// Helper: disable limiter in development
+const makeLimiter = (options) => {
+  if (process.env.NODE_ENV === 'development') {
+    return (req, _res, next) => next();
+  }
+  return rateLimit(options);
+};
+
 // General user profile rate limiting
-const profileRateLimit = rateLimit({
+const profileRateLimit = makeLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 30, // 30 requests per window
   message: {
@@ -18,7 +26,7 @@ const profileRateLimit = rateLimit({
 });
 
 // Avatar upload rate limiting (more restrictive)
-const avatarUploadRateLimit = rateLimit({
+const avatarUploadRateLimit = makeLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // 5 uploads per hour
   message: {
@@ -34,7 +42,7 @@ const avatarUploadRateLimit = rateLimit({
 });
 
 // Account deletion rate limiting (very restrictive)
-const accountDeletionRateLimit = rateLimit({
+const accountDeletionRateLimit = makeLimiter({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 1, // 1 deletion attempt per day
   message: {
@@ -50,7 +58,7 @@ const accountDeletionRateLimit = rateLimit({
 });
 
 // Profile update rate limiting
-const profileUpdateRateLimit = rateLimit({
+const profileUpdateRateLimit = makeLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 updates per window
   message: {
@@ -66,7 +74,7 @@ const profileUpdateRateLimit = rateLimit({
 });
 
 // Authentication rate limiting
-const loginRateLimit = rateLimit({
+const loginRateLimit = makeLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 login attempts per window per IP
   message: {
@@ -82,7 +90,8 @@ const loginRateLimit = rateLimit({
 });
 
 // Registration rate limiting (prevent spam accounts)
-const registrationRateLimit = rateLimit({
+// In development, the limiter is disabled to streamline testing.
+const registrationRateLimit = makeLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 registrations per hour per IP
   message: {
@@ -97,7 +106,7 @@ const registrationRateLimit = rateLimit({
 });
 
 // Password reset rate limiting
-const passwordResetRateLimit = rateLimit({
+const passwordResetRateLimit = makeLimiter({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 password reset requests per hour per IP
   message: {
@@ -112,7 +121,7 @@ const passwordResetRateLimit = rateLimit({
 });
 
 // Email verification rate limiting
-const emailVerificationRateLimit = rateLimit({
+const emailVerificationRateLimit = makeLimiter({
   windowMs: 10 * 60 * 1000, // 10 minutes
   max: 5, // 5 verification attempts per 10 minutes per IP
   message: {
@@ -127,7 +136,7 @@ const emailVerificationRateLimit = rateLimit({
 });
 
 // OAuth rate limiting (for Google auth)
-const oauthRateLimit = rateLimit({
+const oauthRateLimit = makeLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 OAuth attempts per 15 minutes per IP
   message: {

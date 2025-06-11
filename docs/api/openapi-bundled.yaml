@@ -600,16 +600,75 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /auth/complete-registration:
+    post:
+      tags:
+        - Authentication
+      summary: Step 2 – Verify OTP **and** complete registration (recommended)
+      description: |
+        **RECOMMENDED REGISTRATION FLOW – STEP 2 (combined)**
+
+        Verifies the 6-digit OTP sent to the user's email (see `/auth/check-email`) **and** creates the account in a single request.
+        Use this instead of the legacy `/auth/register`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+                - password
+                - firstName
+                - lastName
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john.doe@example.com
+                code:
+                  type: string
+                  example: '123456'
+                  description: 6-digit verification code received via email
+                password:
+                  type: string
+                  minLength: 8
+                  example: SecurePass123!
+                firstName:
+                  type: string
+                  example: John
+                lastName:
+                  type: string
+                  example: Doe
+      responses:
+        '201':
+          description: Registration completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: ../schemas/user.yaml#/TokenResponse
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /auth/register:
     post:
       tags:
         - Authentication
-      summary: Step 3 - Complete registration (after email verified)
+      summary: (Legacy) Step 3 – Complete registration **after** email verified
       description: |
-        **RECOMMENDED REGISTRATION FLOW – STEP 3**
+        **LEGACY ENDPOINT – Prefer `/auth/complete-registration` instead.**
 
-        Creates the user account.  This endpoint requires that the email address has been
-        verified via **/auth/confirm-email**.
+        Creates the user **only if** the email was verified via `/auth/confirm-email`.
+      deprecated: true
       security: []
       requestBody:
         required: true
@@ -934,7 +993,7 @@ paths:
               type: object
               required:
                 - name
-                - dateOfBirth
+                - birthDate
                 - gender
               properties:
                 name:
@@ -942,28 +1001,47 @@ paths:
                   maxLength: 100
                   example: Emma Johnson
                   description: Baby's full name
-                dateOfBirth:
+                birthDate:
                   type: string
                   format: date
                   example: '2024-01-15'
-                  description: Baby's date of birth
+                  description: Baby's birth date
                 gender:
                   type: string
                   enum:
                     - male
                     - female
                     - other
+                    - prefer-not-to-say
                   example: female
                 weight:
-                  type: number
-                  format: float
-                  example: 3.5
-                  description: Birth weight in kilograms
+                  type: object
+                  description: Baby weight information (grams)
+                  properties:
+                    birth:
+                      type: number
+                      format: float
+                      example: 3500
+                      description: Birth weight in grams
+                    current:
+                      type: number
+                      format: float
+                      example: 4500
+                      description: Current weight in grams (optional)
                 height:
-                  type: number
-                  format: float
-                  example: 50.5
-                  description: Birth height in centimeters
+                  type: object
+                  description: Baby height information (cm)
+                  properties:
+                    birth:
+                      type: number
+                      format: float
+                      example: 50.5
+                      description: Birth height in centimeters
+                    current:
+                      type: number
+                      format: float
+                      example: 55.0
+                      description: Current height in centimeters (optional)
                 notes:
                   type: string
                   maxLength: 500
@@ -1100,7 +1178,7 @@ paths:
                   type: string
                   maxLength: 100
                   example: Emma Johnson
-                dateOfBirth:
+                birthDate:
                   type: string
                   format: date
                   example: '2024-01-15'
@@ -1110,17 +1188,36 @@ paths:
                     - male
                     - female
                     - other
+                    - prefer-not-to-say
                   example: female
                 weight:
-                  type: number
-                  format: float
-                  example: 4.2
-                  description: Current weight in kilograms
+                  type: object
+                  description: Baby weight information (grams)
+                  properties:
+                    birth:
+                      type: number
+                      format: float
+                      example: 3500
+                      description: Birth weight in grams
+                    current:
+                      type: number
+                      format: float
+                      example: 4500
+                      description: Current weight in grams (optional)
                 height:
-                  type: number
-                  format: float
-                  example: 55
-                  description: Current height in centimeters
+                  type: object
+                  description: Baby height information (cm)
+                  properties:
+                    birth:
+                      type: number
+                      format: float
+                      example: 50.5
+                      description: Birth height in centimeters
+                    current:
+                      type: number
+                      format: float
+                      example: 55.0
+                      description: Current height in centimeters (optional)
                 notes:
                   type: string
                   maxLength: 500
@@ -2778,28 +2875,47 @@ components:
           type: string
           example: Emma Johnson
           description: Baby's full name
-        dateOfBirth:
+        birthDate:
           type: string
           format: date
           example: '2024-01-15'
-          description: Baby's date of birth
+          description: Baby's birth date
         gender:
           type: string
           enum:
             - male
             - female
             - other
+            - prefer-not-to-say
           example: female
         weight:
-          type: number
-          format: float
-          example: 3.5
-          description: Current weight in kilograms
+          type: object
+          description: Baby weight information (grams)
+          properties:
+            birth:
+              type: number
+              format: float
+              example: 3500
+              description: Birth weight in grams
+            current:
+              type: number
+              format: float
+              example: 4500
+              description: Current weight in grams (optional)
         height:
-          type: number
-          format: float
-          example: 50.5
-          description: Current height in centimeters
+          type: object
+          description: Baby height information (cm)
+          properties:
+            birth:
+              type: number
+              format: float
+              example: 50.5
+              description: Birth height in centimeters
+            current:
+              type: number
+              format: float
+              example: 55.0
+              description: Current height in centimeters (optional)
         notes:
           type: string
           example: Born at 3:45 AM, healthy baby
