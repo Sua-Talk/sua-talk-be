@@ -1,5 +1,47 @@
 const { body, param, query } = require('express-validator');
 
+// Email Check & Send OTP Validation
+const validateEmailCheck = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address')
+];
+
+// Verify OTP & Complete Registration Validation
+const validateOTPAndRegistration = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address'),
+  
+  body('code')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Verification code must be exactly 6 digits')
+    .isNumeric()
+    .withMessage('Verification code must contain only numbers'),
+  
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'),
+  
+  body('firstName')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('First name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('First name can only contain letters and spaces'),
+  
+  body('lastName')
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Last name must be between 2 and 50 characters')
+    .matches(/^[a-zA-Z\s]+$/)
+    .withMessage('Last name can only contain letters and spaces')
+];
+
 // User Registration Validation
 const validateRegistration = [
   body('email')
@@ -407,5 +449,7 @@ module.exports = {
   validateUpdateBaby,
   validateObjectId,
   validateAudioRecordingsQuery,
-  validateOAuthQuery
+  validateOAuthQuery,
+  validateEmailCheck,
+  validateOTPAndRegistration
 }; 

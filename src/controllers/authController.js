@@ -8,7 +8,168 @@ const emailService = require('../services/emailService');
 const jwtService = require('../services/jwtService');
 const passport = require('passport');
 
-// User Registration
+// Step 1: Check Email & Send OTP
+const checkEmailAndSendOTP = withErrorHandling(async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: true,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const { email } = req.body;
+
+  // Check if user already exists with verified email
+  const existingUser = await User.findByEmail(email);
+  if (existingUser && existingUser.isEmailVerified) {
+    return res.status(409).json({
+      error: true,
+      message: 'User with this email already exists'
+    });
+  }
+
+  // Check rate limiting for email verification
+  const rateLimit = await OTP.checkRateLimit(email, 'email_verification');
+  if (!rateLimit.allowed) {
+    return res.status(429).json({
+      error: true,
+      message: 'Too many verification requests. Please try again later.',
+      resetAt: rateLimit.resetAt
+    });
+  }
+
+  // Generate OTP for email verification
+  const otp = await OTP.createOTP(email, 'email_verification', {
+    expirationMinutes: 10,
+    ipAddress: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+
+  // Send verification email
+  try {
+    await emailService.sendVerificationEmail(email, 'User', otp.code);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email. Please check your inbox.',
+      data: {
+        email: email,
+        expiresIn: '10 minutes'
+      }
+    });
+  } catch (emailError) {
+    console.error('Failed to send verification email:', emailError);
+    res.status(500).json({
+      error: true,
+      message: 'Failed to send verification email. Please try again later.'
+    });
+  }
+});
+
+// Step 2: Verify OTP & Complete Registration
+const verifyOTPAndRegister = withErrorHandling(async (req, res) => {
+  // Check for validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: true,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const { email, code, password, firstName, lastName } = req.body;
+
+  // Verify OTP first
+  const otpResult = await OTP.verifyOTP(email, code, 'email_verification');
+  
+  if (!otpResult.success) {
+    return res.status(400).json({
+      error: true,
+      message: otpResult.error,
+      attemptsRemaining: otpResult.attemptsRemaining
+    });
+  }
+
+  // Check if user already exists with verified email (double check)
+  const existingUser = await User.findByEmail(email);
+  if (existingUser && existingUser.isEmailVerified) {
+    return res.status(409).json({
+      error: true,
+      message: 'User with this email already exists'
+    });
+  }
+
+  // Create new user or update existing unverified user
+  let user;
+  if (existingUser && !existingUser.isEmailVerified) {
+    // Update existing unverified user
+    user = existingUser;
+    user.password = password; // Will be hashed by pre-save hook
+    user.firstName = firstName;
+    user.lastName = lastName;
+    user.isEmailVerified = true;
+    await user.save();
+  } else {
+    // Create new user
+    user = new User({
+      email,
+      password, // Will be hashed by pre-save hook
+      firstName,
+      lastName,
+      isEmailVerified: true // Email is already verified via OTP
+    });
+    await user.save();
+  }
+
+  res.status(201).json({
+    success: true,
+    message: 'Registration completed successfully. You can now login.',
+    data: {
+      userId: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isEmailVerified: user.isEmailVerified
+    }
+  });
+});
+
+// Email Confirmation (Step 2)
+const confirmEmail = withErrorHandling(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: true,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const { email, code } = req.body;
+
+  // Verify OTP first
+  const otpResult = await OTP.verifyOTP(email, code, 'email_verification');
+
+  if (!otpResult.success) {
+    return res.status(400).json({
+      error: true,
+      message: otpResult.error,
+      attemptsRemaining: otpResult.attemptsRemaining
+    });
+  }
+
+  // At this stage OTP is valid & marked used.
+  res.json({
+    success: true,
+    message: 'Email verified successfully. You can now complete registration.'
+  });
+});
+
+// User Registration (requires prior email verification)
 const register = withErrorHandling(async (req, res) => {
   // Check for validation errors
   const errors = validationResult(req);
@@ -21,6 +182,20 @@ const register = withErrorHandling(async (req, res) => {
   }
 
   const { email, password, firstName, lastName } = req.body;
+
+  // Ensure email was verified via OTP
+  const verifiedOtp = await OTP.findOne({
+    email: email.toLowerCase(),
+    purpose: 'email_verification',
+    isUsed: true
+  }).sort({ usedAt: -1 });
+
+  if (!verifiedOtp) {
+    return res.status(400).json({
+      error: true,
+      message: 'Email has not been verified. Please confirm your email before registering.'
+    });
+  }
 
   // Check if user already exists
   const existingUser = await User.findByEmail(email);
@@ -37,29 +212,14 @@ const register = withErrorHandling(async (req, res) => {
     password, // Will be hashed by pre-save hook
     firstName,
     lastName,
-    isEmailVerified: false
+    isEmailVerified: true
   });
 
   await user.save();
 
-  // Generate OTP for email verification
-  const otp = await OTP.createOTP(email, 'email_verification', {
-    expirationMinutes: 10,
-    ipAddress: req.ip,
-    userAgent: req.get('User-Agent')
-  });
-
-  // Send verification email
-  try {
-    await emailService.sendVerificationEmail(email, firstName, otp.code);
-  } catch (emailError) {
-    console.error('Failed to send verification email:', emailError);
-    // Don't fail registration if email fails, user can request resend
-  }
-
   res.status(201).json({
     success: true,
-    message: 'User registered successfully. Please check your email for verification code.',
+    message: 'Registration completed successfully. You can now login.',
     data: {
       userId: user._id,
       email: user.email,
@@ -70,7 +230,7 @@ const register = withErrorHandling(async (req, res) => {
   });
 });
 
-// Email Verification
+// Email Verification (keep for legacy support)
 const verifyEmail = withErrorHandling(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -649,6 +809,9 @@ const oauthSuccess = (req, res) => {
 };
 
 module.exports = {
+  checkEmailAndSendOTP,
+  confirmEmail,
+  verifyOTPAndRegister,
   register,
   verifyEmail,
   resendVerificationEmail,

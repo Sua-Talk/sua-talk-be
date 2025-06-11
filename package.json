@@ -13,6 +13,7 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/",
+    "docs:build": "npm run bundle:docs",
     "bundle:docs": "node docs/api/tools/bundle.js",
     "validate:bundled": "redocly lint docs/api/openapi-bundled.yaml",
     "docs": "npm run bundle:docs && npm run validate:bundled"

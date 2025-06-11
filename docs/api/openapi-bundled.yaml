@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-07T17:17:15.573Z*
+    *Last bundled: 2025-06-11T05:43:33.842Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -475,14 +475,18 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
-  /auth/register:
+  /auth/check-email:
     post:
       tags:
         - Authentication
-      summary: Register a new user
+      summary: Step 1 - Check email and send verification OTP
       description: |
-        Create a new user account. After successful registration, an email verification 
-        code will be sent to the provided email address.
+        **RECOMMENDED REGISTRATION FLOW - STEP 1**
+
+        Checks if an email is available for registration and sends a verification OTP code 
+        to the email address. This is the first step in the secure 2-step registration process.
+
+        The user should receive an email with a 6-digit verification code that expires in 10 minutes.
       security: []
       requestBody:
         required: true
@@ -492,49 +496,73 @@ paths:
               type: object
               required:
                 - email
-                - password
-                - firstName
-                - lastName
               properties:
                 email:
                   type: string
                   format: email
                   example: john.doe@example.com
-                  description: Valid email address
-                password:
-                  type: string
-                  minLength: 8
-                  example: SecurePass123!
-                  description: Password must contain at least 8 characters with uppercase, lowercase, number, and special character
-                firstName:
-                  type: string
-                  maxLength: 50
-                  example: John
-                  description: User's first name
-                lastName:
-                  type: string
-                  maxLength: 50
-                  example: Doe
-                  description: User's last name
+                  description: Valid email address to register
+            examples:
+              example1:
+                summary: Standard email check
+                value:
+                  email: john.doe@example.com
       responses:
-        '201':
-          $ref: '#/components/responses/SuccessResponse'
+        '200':
+          description: Verification code sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Verification code sent to your email. Please check your inbox.
+                  data:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+                        example: john.doe@example.com
+                      expiresIn:
+                        type: string
+                        example: 10 minutes
         '400':
           $ref: '#/components/responses/BadRequest'
         '409':
-          description: User already exists
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User with this email already exists
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          description: Failed to send verification email
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-  /auth/verify-email:
+  /auth/confirm-email:
     post:
       tags:
         - Authentication
-      summary: Verify user email
-      description: Verify a user's email address using the code sent during registration.
+      summary: Step 2 - Confirm email with OTP
+      description: |
+        **RECOMMENDED REGISTRATION FLOW – STEP 2**
+
+        Verifies the 6-digit OTP sent to the user's email address in **Step 1**.  On success,
+        the email is marked as verified so that the user can proceed to **Step 3 – Register**.
       security: []
       requestBody:
         required: true
@@ -553,16 +581,76 @@ paths:
                 code:
                   type: string
                   example: '123456'
-                  description: 6-digit verification code sent to email
+                  description: 6-digit verification code received via email
       responses:
         '200':
           description: Email verified successfully
           content:
             application/json:
               schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Email verified successfully. You can now complete registration.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Step 3 - Complete registration (after email verified)
+      description: |
+        **RECOMMENDED REGISTRATION FLOW – STEP 3**
+
+        Creates the user account.  This endpoint requires that the email address has been
+        verified via **/auth/confirm-email**.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - firstName
+                - lastName
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  example: SecurePass123!
+                firstName:
+                  type: string
+                  example: John
+                lastName:
+                  type: string
+                  example: Doe
+      responses:
+        '201':
+          description: Registration completed successfully
+          content:
+            application/json:
+              schema:
                 $ref: ../schemas/user.yaml#/TokenResponse
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /auth/resend-verification:
@@ -2759,6 +2847,29 @@ components:
               message:
                 type: string
                 example: Email is required
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: An error occurred
+        error:
+          type: string
+          example: Validation failed
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: email
+              message:
+                type: string
+                example: Email is required
     Success:
       type: object
       properties:
@@ -2920,6 +3031,25 @@ components:
                   example: 900
                   description: Access token expiration time in seconds
   responses:
+    SuccessResponse:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: true
+              message:
+                type: string
+                example: Operation completed successfully
+              data:
+                type: object
+                description: Response data (structure varies by endpoint)
+            required:
+              - success
+              - message
     BadRequest:
       description: Bad request - validation error
       content:

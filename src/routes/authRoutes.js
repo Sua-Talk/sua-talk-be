@@ -17,7 +17,9 @@ const {
   validateForgotPassword,
   validateResetPassword,
   validateChangePassword,
-  validateOAuthQuery
+  validateOAuthQuery,
+  validateEmailCheck,
+  validateOTPAndRegistration
 } = require('../middleware/validation');
 
 // Import error handling middleware
@@ -34,18 +36,52 @@ const {
 } = require('../middleware/rateLimiting');
 
 /**
+ * RECOMMENDED REGISTRATION FLOW (2-Step Process)
+ */
+
+/**
+ * @route   POST /api/auth/check-email
+ * @desc    Step 1: Check email and send OTP for verification
+ * @access  Public
+ * @body    { email }
+ */
+router.post('/check-email', registrationRateLimit, validateEmailCheck, authController.checkEmailAndSendOTP);
+
+/**
+ * @route   POST /api/auth/confirm-email
+ * @desc    Step 2: Confirm OTP to verify email address
+ * @access  Public
+ * @body    { email, code }
+ */
+router.post('/confirm-email', emailVerificationRateLimit, validateEmailVerification, authController.confirmEmail);
+
+/**
+ * @route   POST /api/auth/complete-registration
+ * @desc    Step 2: Verify OTP and complete user registration
+ * @access  Public
+ * @body    { email, code, password, firstName, lastName }
+ */
+router.post('/complete-registration', registrationRateLimit, validateOTPAndRegistration, authController.verifyOTPAndRegister);
+
+/**
+ * LEGACY REGISTRATION FLOW (For backward compatibility)
+ */
+
+/**
  * @route   POST /api/auth/register
- * @desc    Register a new user
+ * @desc    Register a new user (legacy flow)
  * @access  Public
  * @body    { email, password, firstName, lastName }
+ * @deprecated Use /check-email and /complete-registration instead
  */
 router.post('/register', registrationRateLimit, validateRegistration, authController.register);
 
 /**
  * @route   POST /api/auth/verify-email
- * @desc    Verify user email with OTP
+ * @desc    Verify user email with OTP (legacy flow)
  * @access  Public
  * @body    { email, code }
+ * @deprecated Use /complete-registration instead
  */
 router.post('/verify-email', emailVerificationRateLimit, validateEmailVerification, authController.verifyEmail);
 

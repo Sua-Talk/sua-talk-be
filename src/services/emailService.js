@@ -59,15 +59,25 @@ class EmailService {
 
       console.log(`📧 Sending email to: ${emailOptions.to.join(', ')} | Subject: ${subject}`);
       
-      const result = await this.resend.emails.send(emailOptions);
-      
-      console.log(`✅ Email sent successfully | ID: ${result.data?.id}`);
+      const { data, error } = await this.resend.emails.send(emailOptions);
+
+      // If Resend returns an error object, log it and propagate failure
+      if (error) {
+        console.error('❌ Resend API error:', JSON.stringify(error));
+        return {
+          success: false,
+          error,
+          message: error?.message || 'Failed to send email'
+        };
+      }
+
+      console.log(`✅ Email sent successfully | ID: ${data?.id}`);
       
       return {
         success: true,
-        id: result.data?.id,
+        id: data?.id,
         message: 'Email sent successfully',
-        data: result.data
+        data
       };
 
     } catch (error) {
@@ -645,6 +655,18 @@ SuaTalk Team
         'X-Email-Type': 'notification'
       }
     });
+  }
+
+  /**
+   * Send verification email
+   * @param {string} to - Recipient email
+   * @param {string} userName - User name
+   * @param {string} otpCode - OTP code
+   * @returns {Promise<Object>} Email sending result
+   */
+  async sendVerificationEmail(to, userName = 'User', otpCode) {
+    // Backwards-compatibility wrapper – delegate to sendOTPEmail
+    return this.sendOTPEmail(to, otpCode, userName);
   }
 
   /**
