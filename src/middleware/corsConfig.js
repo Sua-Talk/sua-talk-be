@@ -29,7 +29,8 @@ const getAllowedOrigins = () => {
     // Production origins
     origins.push(
       'https://suatalk.site',
-      'https://www.suatalk.site'
+      'https://www.suatalk.site',
+      'https://api.suatalk.site'
     );
     
     // Custom production frontend URL
