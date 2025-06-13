@@ -1,6 +1,7 @@
 const mlService = require('../services/mlService');
 const jobManager = require('../jobs/jobManager');
 const AudioRecording = require('../models/AudioRecording');
+const Baby = require('../models/Baby');
 const { validationResult } = require('express-validator');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -57,6 +58,105 @@ const getMLClasses = asyncHandler(async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Internal server error while fetching ML classes',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/ml/analyzes
+ * Direct ML analysis with audio file, date_of_birth, and history_data
+ */
+const directMLAnalysis = asyncHandler(async (req, res) => {
+  // Check validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const userId = req.user.id;
+
+  try {
+    // Check if audio file is present
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No audio file provided'
+      });
+    }
+
+    // Get form data
+    const { date_of_birth, baby_id, history_data } = req.body;
+
+    if (!date_of_birth) {
+      return res.status(400).json({
+        success: false,
+        message: 'date_of_birth is required'
+      });
+    }
+
+    // Parse history_data if it's a string
+    let parsedHistoryData = [];
+    if (history_data) {
+      try {
+        parsedHistoryData = typeof history_data === 'string' 
+          ? JSON.parse(history_data) 
+          : history_data;
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid history_data format. Must be valid JSON array.'
+        });
+      }
+    }
+
+    // Verify baby ownership if baby_id is provided
+    if (baby_id) {
+      const baby = await Baby.findOne({
+        _id: baby_id,
+        parentId: userId,
+        isActive: true
+      });
+
+      if (!baby) {
+        return res.status(404).json({
+          success: false,
+          message: 'Baby not found or access denied'
+        });
+      }
+    }
+
+    // Call ML service directly
+    const mlResult = await mlService.predictWithMetadata(
+      req.file.path,
+      date_of_birth,
+      parsedHistoryData,
+      baby_id
+    );
+
+    if (!mlResult.success) {
+      return res.status(503).json({
+        success: false,
+        message: 'ML analysis failed',
+        error: mlResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'ML analysis completed successfully',
+      data: mlResult.data
+    });
+
+  } catch (error) {
+    console.error('Direct ML analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to perform ML analysis',
       error: error.message
     });
   }
@@ -468,6 +568,7 @@ const getMLAnalysisStats = asyncHandler(async (req, res) => {
 module.exports = {
   getMLServiceStatus,
   getMLClasses,
+  directMLAnalysis,
   triggerMLAnalysis,
   getMLAnalysisResult,
   getMLAnalysisHistory,

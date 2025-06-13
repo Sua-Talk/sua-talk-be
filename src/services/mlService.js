@@ -292,6 +292,78 @@ class MLService {
   }
 
   /**
+   * Predict infant cry classification with metadata (date_of_birth, history_data)
+   * @param {string} audioFilePath - Path to the audio file
+   * @param {string} dateOfBirth - Baby's date of birth (ISO 8601 format)
+   * @param {Array} historyData - Array of historical cry analysis data
+   * @param {string} babyId - Optional baby ID
+   * @returns {Promise<Object>} Prediction results with AI recommendations
+   */
+  async predictWithMetadata(audioFilePath, dateOfBirth, historyData = [], babyId = null) {
+    try {
+      // Validate file exists
+      if (!fs.existsSync(audioFilePath)) {
+        throw new Error(`Audio file not found: ${audioFilePath}`);
+      }
+
+      // Validate file extension
+      const ext = path.extname(audioFilePath).toLowerCase();
+      const allowedFormats = ['.wav', '.mp3', '.m4a', '.flac'];
+      if (!allowedFormats.includes(ext)) {
+        throw new Error(`Unsupported audio format: ${ext}. Allowed: ${allowedFormats.join(', ')}`);
+      }
+
+      // Create form data
+      const formData = new FormData();
+      const audioStream = fs.createReadStream(audioFilePath);
+      formData.append('audio', audioStream, {
+        filename: path.basename(audioFilePath),
+        contentType: this.getContentType(ext)
+      });
+
+      // Add metadata
+      formData.append('date_of_birth', dateOfBirth);
+      if (babyId) {
+        formData.append('baby_id', babyId);
+      }
+      if (historyData && historyData.length > 0) {
+        formData.append('history_data', JSON.stringify(historyData));
+      }
+
+      // Make prediction request with circuit breaker protection
+      const response = await this.makeRequest(() => 
+        this.client.post('/predict', formData, {
+          headers: {
+            ...formData.getHeaders(),
+          },
+          timeout: 60000, // Longer timeout for predictions
+        })
+      );
+
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        data: null,
+        circuitBreaker: this.getCircuitBreakerStatus()
+      };
+    } finally {
+      // Clean up temp file if it exists
+      try {
+        if (fs.existsSync(audioFilePath) && audioFilePath.includes('/temp/')) {
+          await promisify(fs.unlink)(audioFilePath);
+        }
+      } catch (cleanupError) {
+        console.warn('Failed to cleanup temp file:', cleanupError.message);
+      }
+    }
+  }
+
+  /**
    * Get content type for audio file extension
    * @param {string} ext - File extension
    * @returns {string} Content type
