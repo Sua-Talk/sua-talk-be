@@ -24,13 +24,13 @@
               email:
                 type: string
                 format: email
-                example: "john.doe@example.com"
+                example: "user@example.com"
                 description: "Valid email address to register"
           examples:
             example1:
               summary: "Standard email check"
               value:
-                email: "john.doe@example.com"
+                email: "user@example.com"
     responses:
       '200':
         description: Verification code sent successfully
@@ -50,7 +50,7 @@
                   properties:
                     email:
                       type: string
-                      example: "john.doe@example.com"
+                      example: "user@example.com"
                     expiresIn:
                       type: string
                       example: "10 minutes"
@@ -102,7 +102,7 @@
               email:
                 type: string
                 format: email
-                example: "john.doe@example.com"
+                example: "user@example.com"
               code:
                 type: string
                 example: "123456"
@@ -197,7 +197,7 @@
               email:
                 type: string
                 format: email
-                example: "john.doe@example.com"
+                example: "user@example.com"
     responses:
       '200':
         $ref: '../responses/common.yaml#/SuccessResponse'
@@ -224,7 +224,7 @@
               email:
                 type: string
                 format: email
-                example: "john.doe@example.com"
+                example: "user@example.com"
               password:
                 type: string
                 example: "SecurePass123!"
@@ -313,7 +313,7 @@
               email:
                 type: string
                 format: email
-                example: "john.doe@example.com"
+                example: "user@example.com"
     responses:
       '200':
         $ref: '../responses/common.yaml#/SuccessResponse'

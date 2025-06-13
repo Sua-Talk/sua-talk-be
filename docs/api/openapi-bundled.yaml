@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-11T05:43:33.842Z*
+    *Last bundled: 2025-06-13T07:50:41.732Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -500,13 +500,13 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: test@example.com
+                  example: user@example.com
                   description: Valid email address to register
             examples:
               example1:
                 summary: Standard email check
                 value:
-                  email: test@example.com
+                  email: user@example.com
       responses:
         '200':
           description: Verification code sent successfully
@@ -526,7 +526,7 @@ paths:
                     properties:
                       email:
                         type: string
-                        example: test@example.com
+                        example: user@example.com
                       expiresIn:
                         type: string
                         example: 10 minutes
@@ -577,7 +577,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: test@example.com
+                  example: user@example.com
                 code:
                   type: string
                   example: '123456'
@@ -672,7 +672,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: test@example.com
+                  example: user@example.com
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
@@ -700,7 +700,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: test@example.com
+                  example: user@example.com
                 password:
                   type: string
                   example: SecurePass123!
@@ -789,7 +789,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: test@example.com
+                  example: user@example.com
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
@@ -946,43 +946,24 @@ paths:
                   type: string
                   format: date
                   example: '2024-01-15'
-                  description: Baby's birth date
+                  description: Baby's date of birth
                 gender:
                   type: string
                   enum:
                     - male
                     - female
                     - other
-                    - prefer-not-to-say
                   example: female
                 weight:
-                  type: object
-                  description: Baby weight information (grams)
-                  properties:
-                    birth:
-                      type: number
-                      format: float
-                      example: 3500
-                      description: Birth weight in grams
-                    current:
-                      type: number
-                      format: float
-                      example: 4500
-                      description: Current weight in grams (optional)
+                  type: number
+                  format: float
+                  example: 3.5
+                  description: Birth weight in kilograms
                 height:
-                  type: object
-                  description: Baby height information (cm)
-                  properties:
-                    birth:
-                      type: number
-                      format: float
-                      example: 50.5
-                      description: Birth height in centimeters
-                    current:
-                      type: number
-                      format: float
-                      example: 55.0
-                      description: Current height in centimeters (optional)
+                  type: number
+                  format: float
+                  example: 50.5
+                  description: Birth height in centimeters
                 notes:
                   type: string
                   maxLength: 500
@@ -1129,36 +1110,17 @@ paths:
                     - male
                     - female
                     - other
-                    - prefer-not-to-say
                   example: female
                 weight:
-                  type: object
-                  description: Baby weight information (grams)
-                  properties:
-                    birth:
-                      type: number
-                      format: float
-                      example: 3500
-                      description: Birth weight in grams
-                    current:
-                      type: number
-                      format: float
-                      example: 4500
-                      description: Current weight in grams (optional)
+                  type: number
+                  format: float
+                  example: 4.2
+                  description: Current weight in kilograms
                 height:
-                  type: object
-                  description: Baby height information (cm)
-                  properties:
-                    birth:
-                      type: number
-                      format: float
-                      example: 50.5
-                      description: Birth height in centimeters
-                    current:
-                      type: number
-                      format: float
-                      example: 55.0
-                      description: Current height in centimeters (optional)
+                  type: number
+                  format: float
+                  example: 55
+                  description: Current height in centimeters
                 notes:
                   type: string
                   maxLength: 500
@@ -1975,17 +1937,16 @@ paths:
                       classes:
                         type: array
                         items:
-                          type: object
-                          properties:
-                            id:
-                              type: string
-                              example: hunger
-                            name:
-                              type: string
-                              example: Hunger
-                            description:
-                              type: string
-                              example: Baby is crying due to hunger or feeding needs
+                          type: string
+                        example:
+                          - sakit perut
+                          - kembung
+                          - tidak nyaman
+                          - lapar
+                          - lelah
+                      total_classes:
+                        type: integer
+                        example: 5
   /ml/analyze/{recordingId}:
     post:
       tags:
@@ -2820,43 +2781,24 @@ components:
           type: string
           format: date
           example: '2024-01-15'
-          description: Baby's birth date
+          description: Baby's date of birth
         gender:
           type: string
           enum:
             - male
             - female
             - other
-            - prefer-not-to-say
           example: female
         weight:
-          type: object
-          description: Baby weight information (grams)
-          properties:
-            birth:
-              type: number
-              format: float
-              example: 3500
-              description: Birth weight in grams
-            current:
-              type: number
-              format: float
-              example: 4500
-              description: Current weight in grams (optional)
+          type: number
+          format: float
+          example: 3.5
+          description: Current weight in kilograms
         height:
-          type: object
-          description: Baby height information (cm)
-          properties:
-            birth:
-              type: number
-              format: float
-              example: 50.5
-              description: Birth height in centimeters
-            current:
-              type: number
-              format: float
-              example: 55.0
-              description: Current height in centimeters (optional)
+          type: number
+          format: float
+          example: 50.5
+          description: Current height in centimeters
         notes:
           type: string
           example: Born at 3:45 AM, healthy baby

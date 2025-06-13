@@ -20,7 +20,13 @@ const CIRCUIT_STATES = {
 class MLService {
   constructor() {
     // Environment-based URL configuration
-    this.baseURL = process.env.ML_SERVICE_URL;
+    this.baseURL = process.env.ML_SERVICE_URL || (
+      process.env.NODE_ENV === 'production' 
+        ? 'http://srv-captain--ml' 
+        : 'http://localhost:4000'
+    );
+    
+    console.log(`🔧 ML Service URL: ${this.baseURL}`);
     
     // Circuit breaker configuration
     this.circuitBreaker = {
@@ -59,7 +65,8 @@ class MLService {
           status: error.response?.status,
           message: error.message,
           data: error.response?.data,
-          circuitState: this.circuitBreaker.state
+          circuitState: this.circuitBreaker.state,
+          baseURL: this.baseURL
         });
         return Promise.reject(error);
       }

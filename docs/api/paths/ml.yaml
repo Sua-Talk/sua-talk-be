@@ -60,17 +60,11 @@
                     classes:
                       type: array
                       items:
-                        type: object
-                        properties:
-                          id:
-                            type: string
-                            example: "hunger"
-                          name:
-                            type: string
-                            example: "Hunger"
-                          description:
-                            type: string
-                            example: "Baby is crying due to hunger or feeding needs"
+                        type: string
+                      example: ["sakit perut", "kembung", "tidak nyaman", "lapar", "lelah"]
+                    total_classes:
+                      type: integer
+                      example: 5
 
 /ml/analyze/{recordingId}:
   post:

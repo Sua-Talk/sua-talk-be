@@ -9,7 +9,7 @@ Baby:
       type: string
       example: "Emma Johnson"
       description: "Baby's full name"
-    dateOfBirth:
+    birthDate:
       type: string
       format: date
       example: "2024-01-15"

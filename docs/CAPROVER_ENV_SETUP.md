@@ -40,9 +40,8 @@ MINIO_SECRET_KEY=your-minio-secret-key
 MINIO_BUCKET_NAME=suatalk-files
 MINIO_REGION=us-east-1
 
-# ML Service Configuration (jika ada)
+# ML Service Configuration
 ML_SERVICE_URL=http://srv-captain--ml
-ML_SERVICE_PORT=5000
 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -93,7 +92,7 @@ Di CapRover, Anda dapat melihat environment variables yang sudah di-set di:
 |---------|-------------|---------|
 | **MongoDB** | `mongodb://srv-captain--mongodb:27017` | Database |
 | **Minio** | `http://srv-captain--minio:9000` | File Storage |
-| **ML Service** | `http://srv-captain--ml:5000` | AI Processing |
+| **ML Service** | `http://srv-captain--ml` | AI Processing |
 
 ## ⚙️ **Minio Configuration:**
 

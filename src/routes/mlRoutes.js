@@ -1,20 +1,16 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const multer = require('multer');
-const path = require('path');
 const { authenticate, requireActiveAccount } = require('../middleware/auth');
 const { securityLogger } = require('../middleware/security');
 const {
   validateRecordingId,
   validateUserId,
   validateMLHistoryQuery,
-  validateMLAnalysisTrigger,
-  validateDirectMLAnalysis
+  validateMLAnalysisTrigger
 } = require('../middleware/mlValidation');
 const {
   getMLServiceStatus,
   getMLClasses,
-  directMLAnalysis,
   triggerMLAnalysis,
   getMLAnalysisResult,
   getMLAnalysisHistory,
@@ -22,32 +18,6 @@ const {
 } = require('../controllers/mlController');
 
 const router = express.Router();
-
-// Configure multer for direct audio upload
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/temp/');
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedMimes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a', 'audio/flac'];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only audio files are allowed.'));
-    }
-  }
-});
 
 // Rate limiting for ML operations
 const mlAnalysisLimiter = rateLimit({
@@ -91,20 +61,6 @@ router.get('/status', getMLServiceStatus);
 router.get('/classes', getMLClasses);
 
 // Protected endpoints (authentication required)
-
-/**
- * POST /api/ml/analyzes
- * Direct ML analysis with audio file upload
- */
-router.post('/analyzes',
-  mlAnalysisLimiter,
-  authenticate,
-  requireActiveAccount,
-  upload.single('audio'),
-  validateDirectMLAnalysis,
-  securityLogger,
-  directMLAnalysis
-);
 
 /**
  * POST /api/ml/analyze/:recordingId

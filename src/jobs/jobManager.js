@@ -69,24 +69,29 @@ class JobManager {
    * Define all job processors
    */
   defineJobs() {
-    // Audio analysis job processor
+    // Audio analysis job
     this.agenda.define('analyze audio', { priority: 'high', concurrency: 2 }, async (job) => {
       const { recordingId } = job.attrs.data;
       
       try {
-        console.log(`🔄 Starting audio analysis for recording: ${recordingId}`);
-        
-        // Find the audio recording
-        const recording = await AudioRecording.findById(recordingId);
+        // Find the audio recording and populate baby data
+        const recording = await AudioRecording.findById(recordingId)
+          .populate('babyId', 'name birthDate')
+          .populate('userId', 'email');
+          
         if (!recording) {
           throw new Error(`Audio recording not found: ${recordingId}`);
         }
 
-        // Check if already processed or processing
-        if (['completed', 'processing'].includes(recording.analysisStatus)) {
-          console.log(`⏭️ Recording ${recordingId} already processed/processing`);
-          return;
+        if (!recording.babyId || !recording.babyId.birthDate) {
+          throw new Error(`Baby birth date not found for recording: ${recordingId}`);
         }
+
+        console.log(`🎯 Processing audio analysis for recording: ${recordingId}`, {
+          filename: recording.filename,
+          baby: recording.babyId.name,
+          birthDate: recording.babyId.birthDate
+        });
 
         // Mark as processing
         await recording.markAnalysisProcessing();
@@ -99,8 +104,29 @@ class JobManager {
 
         const startTime = Date.now();
 
-        // Send to ML service for prediction
-        const result = await mlService.predictAudio(recording.filePath);
+        // Get baby's history for better predictions
+        const historyRecordings = await AudioRecording.find({
+          babyId: recording.babyId._id,
+          analysisStatus: 'completed',
+          _id: { $ne: recordingId }
+        })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select('mlAnalysis.prediction mlAnalysis.confidence createdAt');
+
+        const historyData = historyRecordings.map(rec => ({
+          date: rec.createdAt.toISOString().split('T')[0],
+          classification: rec.mlAnalysis.prediction,
+          confidence: rec.mlAnalysis.confidence
+        }));
+
+        // Send to ML service for prediction with metadata
+        const result = await mlService.predictWithMetadata(
+          recording.filePath,
+          recording.babyId.birthDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+          historyData,
+          recording.babyId._id.toString()
+        );
         
         if (!result.success) {
           throw new Error(`ML prediction failed: ${result.error}`);

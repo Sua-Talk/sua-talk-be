@@ -12,14 +12,14 @@
         application/json:
           schema:
             type: object
-            required: [name, dateOfBirth, gender]
+            required: [name, birthDate, gender]
             properties:
               name:
                 type: string
                 maxLength: 100
                 example: "Emma Johnson"
                 description: "Baby's full name"
-              dateOfBirth:
+              birthDate:
                 type: string
                 format: date
                 example: "2024-01-15"
@@ -177,7 +177,7 @@
                 type: string
                 maxLength: 100
                 example: "Emma Johnson"
-              dateOfBirth:
+              birthDate:
                 type: string
                 format: date
                 example: "2024-01-15"
