@@ -8,7 +8,7 @@ User:
     email:
       type: string
       format: email
-      example: "user@example.com"
+      example: "test@example.com"
     firstName:
       type: string
       example: "John"

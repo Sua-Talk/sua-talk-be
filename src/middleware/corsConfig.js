@@ -30,7 +30,8 @@ const getAllowedOrigins = () => {
     origins.push(
       'https://suatalk.site',
       'https://www.suatalk.site',
-      'https://api.suatalk.site'
+      'https://api.suatalk.site',
+      'http://localhost:3000'
     );
     
     // Custom production frontend URL

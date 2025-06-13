@@ -500,13 +500,13 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: john.doe@example.com
+                  example: test@example.com
                   description: Valid email address to register
             examples:
               example1:
                 summary: Standard email check
                 value:
-                  email: john.doe@example.com
+                  email: test@example.com
       responses:
         '200':
           description: Verification code sent successfully
@@ -526,7 +526,7 @@ paths:
                     properties:
                       email:
                         type: string
-                        example: john.doe@example.com
+                        example: test@example.com
                       expiresIn:
                         type: string
                         example: 10 minutes
@@ -577,7 +577,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: john.doe@example.com
+                  example: test@example.com
                 code:
                   type: string
                   example: '123456'
@@ -600,75 +600,16 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '429':
           $ref: '#/components/responses/TooManyRequests'
-  /auth/complete-registration:
-    post:
-      tags:
-        - Authentication
-      summary: Step 2 – Verify OTP **and** complete registration (recommended)
-      description: |
-        **RECOMMENDED REGISTRATION FLOW – STEP 2 (combined)**
-
-        Verifies the 6-digit OTP sent to the user's email (see `/auth/check-email`) **and** creates the account in a single request.
-        Use this instead of the legacy `/auth/register`.
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - code
-                - password
-                - firstName
-                - lastName
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: john.doe@example.com
-                code:
-                  type: string
-                  example: '123456'
-                  description: 6-digit verification code received via email
-                password:
-                  type: string
-                  minLength: 8
-                  example: SecurePass123!
-                firstName:
-                  type: string
-                  example: John
-                lastName:
-                  type: string
-                  example: Doe
-      responses:
-        '201':
-          description: Registration completed successfully
-          content:
-            application/json:
-              schema:
-                $ref: ../schemas/user.yaml#/TokenResponse
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '409':
-          description: User already exists
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
   /auth/register:
     post:
       tags:
         - Authentication
-      summary: (Legacy) Step 3 – Complete registration **after** email verified
+      summary: Step 3 - Complete registration (after email verified)
       description: |
-        **LEGACY ENDPOINT – Prefer `/auth/complete-registration` instead.**
+        **RECOMMENDED REGISTRATION FLOW – STEP 3**
 
-        Creates the user **only if** the email was verified via `/auth/confirm-email`.
-      deprecated: true
+        Creates the user account.  This endpoint requires that the email address has been
+        verified via **/auth/confirm-email**.
       security: []
       requestBody:
         required: true
@@ -731,7 +672,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: john.doe@example.com
+                  example: test@example.com
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
@@ -759,7 +700,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: john.doe@example.com
+                  example: test@example.com
                 password:
                   type: string
                   example: SecurePass123!
@@ -848,7 +789,7 @@ paths:
                 email:
                   type: string
                   format: email
-                  example: john.doe@example.com
+                  example: test@example.com
       responses:
         '200':
           $ref: '#/components/responses/SuccessResponse'
@@ -3080,7 +3021,7 @@ components:
         email:
           type: string
           format: email
-          example: user@example.com
+          example: test@example.com
         firstName:
           type: string
           example: John

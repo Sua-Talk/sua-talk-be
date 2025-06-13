@@ -246,10 +246,23 @@ tokenSchema.statics.cleanupExpired = async function() {
 };
 
 // Instance method to invalidate token
-tokenSchema.methods.invalidate = function() {
-  this.isUsed = true;
-  this.usedAt = new Date();
-  return this.save();
+tokenSchema.methods.invalidate = async function() {
+  // Use findOneAndUpdate to avoid parallel save issues
+  const updated = await this.constructor.findOneAndUpdate(
+    { _id: this._id, isUsed: false },
+    { 
+      isUsed: true,
+      usedAt: new Date()
+    },
+    { new: true }
+  );
+  
+  if (updated) {
+    this.isUsed = true;
+    this.usedAt = updated.usedAt;
+  }
+  
+  return this;
 };
 
 const Token = mongoose.model('Token', tokenSchema);

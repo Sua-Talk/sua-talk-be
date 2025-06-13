@@ -31,6 +31,20 @@ const checkEmailAndSendOTP = withErrorHandling(async (req, res) => {
     });
   }
 
+  // In development, skip OTP generation and email sending to save limits
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[DEV] Skipping OTP email for ${email} - use any code for verification`);
+    return res.status(200).json({
+      success: true,
+      message: 'Development mode: Verification code skipped. Use any code to proceed.',
+      data: {
+        email: email,
+        expiresIn: '10 minutes',
+        devMode: true
+      }
+    });
+  }
+
   // Check rate limiting for email verification
   const rateLimit = await OTP.checkRateLimit(email, 'email_verification');
   if (!rateLimit.allowed) {
@@ -151,6 +165,15 @@ const confirmEmail = withErrorHandling(async (req, res) => {
 
   const { email, code } = req.body;
 
+  // In development, skip OTP verification to save email limits
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[DEV] Skipping OTP verification for ${email} with code ${code}`);
+    return res.json({
+      success: true,
+      message: 'Email verified successfully (dev mode - OTP skipped). You can now complete registration.'
+    });
+  }
+
   // Verify OTP first
   const otpResult = await OTP.verifyOTP(email, code, 'email_verification');
 
@@ -183,18 +206,23 @@ const register = withErrorHandling(async (req, res) => {
 
   const { email, password, firstName, lastName } = req.body;
 
-  // Ensure email was verified via OTP
-  const verifiedOtp = await OTP.findOne({
-    email: email.toLowerCase(),
-    purpose: 'email_verification',
-    isUsed: true
-  }).sort({ usedAt: -1 });
+  // In development, skip email verification check to streamline testing
+  if (process.env.NODE_ENV !== 'development') {
+    // Ensure email was verified via OTP (only in production)
+    const verifiedOtp = await OTP.findOne({
+      email: email.toLowerCase(),
+      purpose: 'email_verification',
+      isUsed: true
+    }).sort({ usedAt: -1 });
 
-  if (!verifiedOtp) {
-    return res.status(400).json({
-      error: true,
-      message: 'Email has not been verified. Please confirm your email before registering.'
-    });
+    if (!verifiedOtp) {
+      return res.status(400).json({
+        error: true,
+        message: 'Email has not been verified. Please confirm your email before registering.'
+      });
+    }
+  } else {
+    console.log(`[DEV] Skipping email verification check for ${email}`);
   }
 
   // Check if user already exists
