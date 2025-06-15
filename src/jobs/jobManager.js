@@ -112,9 +112,14 @@ class JobManager {
         }
 
         // Update status to processing
+        const currentRecord = await AudioRecording.findById(recordingId);
+        const currentRetryCount = currentRecord?.analysisMetadata?.retryCount || 0;
+        
         await AudioRecording.findByIdAndUpdate(recordingId, {
-          analysisStatus: 'processing',
-          'analysisMetadata.retryCount': { $inc: 1 }
+          $set: {
+            analysisStatus: 'processing',
+            'analysisMetadata.retryCount': currentRetryCount + 1
+          }
         });
 
         // For cloud storage, we need to construct the file path differently
