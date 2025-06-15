@@ -37,3 +37,4 @@ sua-talk-ml/
 final_review_gate.py
 .env.production
 docs/CAPROVER_ENV_SETUP.md
+docs/FRONTEND_JWT_GUIDE.md

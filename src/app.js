@@ -134,7 +134,7 @@ const sessionConfig = {
 if (process.env.NODE_ENV === 'production') {
   try {
     const redis = require('redis');
-    const RedisStore = require('connect-redis')(session);
+    const RedisStore = require('connect-redis').default;
     
     const redisClient = redis.createClient({
       socket: {
@@ -149,6 +149,11 @@ if (process.env.NODE_ENV === 'production') {
     // Setup Redis error handling with fallback
     redisClient.on('error', (err) => {
       console.warn('⚠️ Redis session store error, falling back to MemoryStore:', err.message);
+    });
+
+    // Connect to Redis
+    redisClient.connect().catch((err) => {
+      console.warn('⚠️ Failed to connect to Redis, using MemoryStore:', err.message);
     });
 
     sessionConfig.store = new RedisStore({ client: redisClient });
