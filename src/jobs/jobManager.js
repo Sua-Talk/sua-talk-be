@@ -184,23 +184,27 @@ class JobManager {
             const retryAt = new Date(Date.now() + retryDelay);
             
             console.log(`📅 Audio analysis scheduled for recording: ${recordingId} at ${retryAt.toISOString()}`);
-            console.log(`�� Scheduled retry ${currentRetryCount + 1} for recording: ${recordingId} in ${retryDelay}ms`);
+            console.log(`🔄 Scheduled retry ${currentRetryCount + 1} for recording: ${recordingId} in ${retryDelay}ms`);
             
-            // Schedule the retry
-            await this.schedule('analyze audio', { recordingId }, retryAt);
+            // Schedule the retry using agenda.schedule
+            await this.agenda.schedule(retryAt, 'analyze audio', { recordingId });
             
             // Update retry metadata but keep status as pending for retry
             await AudioRecording.findByIdAndUpdate(recordingId, {
-              'analysisMetadata.retryCount': currentRetryCount + 1,
-              'analysisMetadata.lastRetryAt': new Date(),
-              'mlServiceResponse.error': error.message
+              $set: {
+                'analysisMetadata.retryCount': currentRetryCount + 1,
+                'analysisMetadata.lastRetryAt': new Date(),
+                'mlServiceResponse.error': error.message
+              }
             });
           } else {
             // Max retries reached, mark as permanently failed
             await AudioRecording.findByIdAndUpdate(recordingId, {
-              analysisStatus: 'failed',
-              'mlServiceResponse.error': `Max retries reached: ${error.message}`,
-              'analysisMetadata.analyzedAt': new Date()
+              $set: {
+                analysisStatus: 'failed',
+                'mlServiceResponse.error': `Max retries reached: ${error.message}`,
+                'analysisMetadata.analyzedAt': new Date()
+              }
             });
             
             console.log(`❌ Max retries reached for recording: ${recordingId}, marking as permanently failed`);
