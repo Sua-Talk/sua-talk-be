@@ -136,8 +136,38 @@ class JobManager {
 
         console.log(`🔍 Analyzing audio file: ${audioFilePath}`);
         
-        // Call ML service for prediction
-        const predictionResult = await mlService.predictAudio(audioFilePath);
+        // Prepare metadata for enhanced ML prediction
+        const dateOfBirth = recording.babyId.birthDate.toISOString();
+        const babyId = recording.babyId._id.toString();
+        
+        // Get historical analysis data for this baby (last 10 recordings)
+        const historicalRecordings = await AudioRecording.find({
+          babyId: recording.babyId._id,
+          analysisStatus: 'completed',
+          'mlAnalysis.prediction': { $exists: true },
+          _id: { $ne: recordingId } // Exclude current recording
+        })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select('mlAnalysis.prediction mlAnalysis.confidence createdAt recordingContext');
+        
+        // Format historical data for ML service
+        const historyData = historicalRecordings.map(rec => ({
+          prediction: rec.mlAnalysis.prediction,
+          confidence: rec.mlAnalysis.confidence,
+          timestamp: rec.createdAt.toISOString(),
+          context: rec.recordingContext || {}
+        }));
+        
+        console.log(`📊 Including ${historyData.length} historical recordings for enhanced prediction`);
+        
+        // Call ML service for prediction with metadata
+        const predictionResult = await mlService.predictWithMetadata(
+          audioFilePath, 
+          dateOfBirth, 
+          historyData, 
+          babyId
+        );
         
         if (!predictionResult.success) {
           throw new Error(`ML prediction failed: ${predictionResult.error}`);
