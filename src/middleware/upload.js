@@ -189,10 +189,58 @@ const uploadAvatar = createUploadMiddleware(
   'avatar'
 );
 
+// Error handling middleware for multer
+const handleUploadError = (error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      const isAudioUpload = req.route?.path?.includes('audio');
+      const maxSize = isAudioUpload ? '50MB' : '5MB';
+      return res.status(400).json({
+        success: false,
+        message: `File too large. Maximum size is ${maxSize}.`,
+        error: 'FILE_TOO_LARGE'
+      });
+    }
+    
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        success: false,
+        message: 'Too many files. Only one file is allowed.',
+        error: 'TOO_MANY_FILES'
+      });
+    }
+    
+    if (error.code === 'LIMIT_UNEXPECTED_FILE') {
+      const isAudioUpload = req.route?.path?.includes('audio');
+      const expectedField = isAudioUpload ? 'audio' : 'photo';
+      return res.status(400).json({
+        success: false,
+        message: `Unexpected field name. Use "${expectedField}" as the field name.`,
+        error: 'UNEXPECTED_FIELD'
+      });
+    }
+  }
+  
+  if (error.message.includes('Invalid file type') || 
+      error.message.includes('Only image files') ||
+      error.message.includes('Only audio files') ||
+      error.message.includes('Invalid audio file type')) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+      error: 'INVALID_FILE_TYPE'
+    });
+  }
+  
+  // Pass other errors to the next error handler
+  next(error);
+};
+
 module.exports = {
   uploadBabyPhoto,
   uploadAudioRecording,
   uploadAvatar,
+  handleUploadError,
   // Export local uploads for direct use if needed
   localUploads: {
     photoUpload: photoUpload.single('photo'),
