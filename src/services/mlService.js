@@ -22,7 +22,7 @@ class MLService {
     // Environment-based URL configuration
     this.baseURL = process.env.ML_SERVICE_URL || (
       process.env.NODE_ENV === 'production' 
-        ? 'http://srv-captain--ml' 
+        ? 'http://srv-captain--ml:5000'  // Fixed: Added port 5000 for production
         : 'http://localhost:4000'
     );
     

@@ -18,9 +18,21 @@ const getMLServiceStatus = asyncHandler(async (req, res) => {
   try {
     const serviceStatus = await mlService.getServiceStatus();
     
+    // Add additional debugging information
+    const debugInfo = {
+      baseURL: mlService.baseURL,
+      environment: process.env.NODE_ENV,
+      mlServiceUrl: process.env.ML_SERVICE_URL,
+      circuitBreakerState: serviceStatus.circuitBreaker?.state,
+      lastAttempt: serviceStatus.circuitBreaker?.nextAttempt ? new Date(serviceStatus.circuitBreaker.nextAttempt).toISOString() : null
+    };
+    
     res.json({
       success: true,
-      data: serviceStatus,
+      data: {
+        ...serviceStatus,
+        debug: debugInfo
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -28,6 +40,11 @@ const getMLServiceStatus = asyncHandler(async (req, res) => {
       success: false,
       message: 'Failed to get ML service status',
       error: error.message,
+      debug: {
+        baseURL: mlService.baseURL,
+        environment: process.env.NODE_ENV,
+        mlServiceUrl: process.env.ML_SERVICE_URL
+      },
       timestamp: new Date().toISOString()
     });
   }
@@ -466,11 +483,52 @@ const getMLAnalysisStats = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * POST /api/ml/reset-circuit
+ * Reset circuit breaker and test connection to ML service
+ */
+const resetCircuitBreaker = asyncHandler(async (req, res) => {
+  try {
+    // Force reset circuit breaker
+    mlService.circuitBreaker.state = 'CLOSED';
+    mlService.circuitBreaker.failureCount = 0;
+    mlService.circuitBreaker.successCount = 0;
+    mlService.circuitBreaker.nextAttempt = Date.now();
+    
+    console.log('🔄 Circuit breaker manually reset');
+    
+    // Test health check
+    const healthResult = await mlService.healthCheck();
+    
+    res.json({
+      success: true,
+      message: 'Circuit breaker reset successfully',
+      data: {
+        circuitBreakerReset: true,
+        healthCheck: healthResult,
+        baseURL: mlService.baseURL,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Reset circuit breaker error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      data: {
+        circuitBreakerReset: false,
+        baseURL: mlService.baseURL
+      }
+    });
+  }
+});
+
 module.exports = {
   getMLServiceStatus,
   getMLClasses,
   triggerMLAnalysis,
   getMLAnalysisResult,
   getMLAnalysisHistory,
-  getMLAnalysisStats
+  getMLAnalysisStats,
+  resetCircuitBreaker
 }; 

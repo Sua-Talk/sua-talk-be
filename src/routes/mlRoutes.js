@@ -14,7 +14,8 @@ const {
   triggerMLAnalysis,
   getMLAnalysisResult,
   getMLAnalysisHistory,
-  getMLAnalysisStats
+  getMLAnalysisStats,
+  resetCircuitBreaker
 } = require('../controllers/mlController');
 
 const router = express.Router();
@@ -53,6 +54,12 @@ const mlQueryLimiter = rateLimit({
  * Get ML service health status
  */
 router.get('/status', getMLServiceStatus);
+
+/**
+ * POST /api/ml/reset-circuit
+ * Reset circuit breaker and test ML service connection (development/debugging only)
+ */
+router.post('/reset-circuit', resetCircuitBreaker);
 
 /**
  * GET /api/ml/classes

@@ -2,6 +2,8 @@ const Agenda = require('agenda');
 const AudioRecording = require('../models/AudioRecording');
 const mlService = require('../services/mlService');
 const fileStorageService = require('../services/fileStorage');
+const path = require('path');
+const fs = require('fs');
 
 /**
  * Agenda Job Manager
@@ -93,70 +95,118 @@ class JobManager {
           birthDate: recording.babyId.birthDate
         });
 
-        // Mark as processing
-        await recording.markAnalysisProcessing();
+        // Check if ML service is available before attempting analysis
+        const isServiceAvailable = await mlService.isServiceAvailable();
         
-        // Check ML service availability
-        const isAvailable = await mlService.isServiceAvailable();
-        if (!isAvailable) {
+        if (!isServiceAvailable) {
+          console.log(`⚠️ ML Service not available, marking analysis as failed for recording: ${recordingId}`);
+          
+          // Update recording status to failed
+          await AudioRecording.findByIdAndUpdate(recordingId, {
+            analysisStatus: 'failed',
+            'mlServiceResponse.error': 'ML Service is not available',
+            'analysisMetadata.analyzedAt': new Date()
+          });
+          
           throw new Error('ML Service is not available');
         }
 
-        const startTime = Date.now();
-
-        // Get baby's history for better predictions
-        const historyRecordings = await AudioRecording.find({
-          babyId: recording.babyId._id,
-          analysisStatus: 'completed',
-          _id: { $ne: recordingId }
-        })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .select('mlAnalysis.prediction mlAnalysis.confidence createdAt');
-
-        const historyData = historyRecordings.map(rec => ({
-          date: rec.createdAt.toISOString().split('T')[0],
-          classification: rec.mlAnalysis.prediction,
-          confidence: rec.mlAnalysis.confidence
-        }));
-
-        // Send to ML service for prediction with metadata
-        const result = await mlService.predictWithMetadata(
-          recording.filePath,
-          recording.babyId.birthDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-          historyData,
-          recording.babyId._id.toString()
-        );
-        
-        if (!result.success) {
-          throw new Error(`ML prediction failed: ${result.error}`);
-        }
-
-        const processingTime = Date.now() - startTime;
-
-        // Update recording with results
-        await recording.updateMLAnalysisResult(result.data, processingTime);
-        
-        console.log(`✅ Audio analysis completed for recording: ${recordingId}`, {
-          prediction: result.data.prediction,
-          confidence: result.data.confidence,
-          processingTime: `${processingTime}ms`
+        // Update status to processing
+        await AudioRecording.findByIdAndUpdate(recordingId, {
+          analysisStatus: 'processing',
+          'analysisMetadata.retryCount': { $inc: 1 }
         });
 
+        // For cloud storage, we need to construct the file path differently
+        let audioFilePath;
+        
+        if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
+          // For cloud storage URLs, we'll need to download the file first
+          // This is a simplified version - you might want to implement file streaming
+          console.log(`📁 Audio file stored in cloud storage: ${recording.filePath}`);
+          throw new Error('Cloud storage file analysis not yet implemented');
+        } else {
+          // Local file path
+          audioFilePath = path.resolve(recording.filePath);
+          
+          if (!fs.existsSync(audioFilePath)) {
+            throw new Error(`Audio file not found at path: ${audioFilePath}`);
+          }
+        }
+
+        console.log(`🔍 Analyzing audio file: ${audioFilePath}`);
+        
+        // Call ML service for prediction
+        const predictionResult = await mlService.predictAudio(audioFilePath);
+        
+        if (!predictionResult.success) {
+          throw new Error(`ML prediction failed: ${predictionResult.error}`);
+        }
+
+        const prediction = predictionResult.data;
+        console.log(`🎯 ML Prediction result:`, prediction);
+
+        // Update recording with analysis results
+        const updateData = {
+          analysisStatus: 'completed',
+          'mlAnalysis.prediction': prediction.prediction,
+          'mlAnalysis.confidence': prediction.confidence,
+          'mlAnalysis.allPredictions': new Map(Object.entries(prediction.all_predictions || {})),
+          'mlAnalysis.featureShape': prediction.feature_shape,
+          'mlServiceResponse.modelVersion': prediction.model_version || 'unknown',
+          'mlServiceResponse.processingTime': prediction.processing_time || null,
+          'mlServiceResponse.rawResponse': prediction,
+          'analysisMetadata.analyzedAt': new Date()
+        };
+
+        const updatedRecording = await AudioRecording.findByIdAndUpdate(
+          recordingId, 
+          updateData, 
+          { new: true }
+        );
+
+        console.log(`✅ Audio analysis completed for recording: ${recordingId}`);
+        console.log(`🎯 Prediction: ${prediction.prediction} (confidence: ${(prediction.confidence * 100).toFixed(1)}%)`);
+
+        return updatedRecording;
+        
       } catch (error) {
         console.error(`❌ Audio analysis failed for recording: ${recordingId}`, error);
         
-        // Mark as failed and increment retry count
-        const recording = await AudioRecording.findById(recordingId);
-        if (recording) {
-          await recording.markAnalysisFailed(error.message);
+        // Update recording status to failed
+        try {
+          const retryData = await AudioRecording.findById(recordingId);
+          const currentRetryCount = retryData?.analysisMetadata?.retryCount || 0;
           
-          // Schedule retry if possible
-          if (recording.canRetryAnalysis()) {
-            const retryDelay = this.calculateRetryDelay(recording.analysisMetadata.retryCount);
-            await this.scheduleAudioAnalysis(recordingId, retryDelay);
-            console.log(`🔄 Scheduled retry ${recording.analysisMetadata.retryCount + 1} for recording: ${recordingId} in ${retryDelay}ms`);
+          if (currentRetryCount < 3) {
+            // Schedule retry with exponential backoff
+            const retryDelay = Math.pow(2, currentRetryCount) * 60000; // 1, 2, 4 minutes
+            const retryAt = new Date(Date.now() + retryDelay);
+            
+            console.log(`📅 Audio analysis scheduled for recording: ${recordingId} at ${retryAt.toISOString()}`);
+            console.log(`�� Scheduled retry ${currentRetryCount + 1} for recording: ${recordingId} in ${retryDelay}ms`);
+            
+            // Schedule the retry
+            await this.schedule('analyze audio', { recordingId }, retryAt);
+            
+            // Update retry metadata but keep status as pending for retry
+            await AudioRecording.findByIdAndUpdate(recordingId, {
+              'analysisMetadata.retryCount': currentRetryCount + 1,
+              'analysisMetadata.lastRetryAt': new Date(),
+              'mlServiceResponse.error': error.message
+            });
+          } else {
+            // Max retries reached, mark as permanently failed
+            await AudioRecording.findByIdAndUpdate(recordingId, {
+              analysisStatus: 'failed',
+              'mlServiceResponse.error': `Max retries reached: ${error.message}`,
+              'analysisMetadata.analyzedAt': new Date()
+            });
+            
+            console.log(`❌ Max retries reached for recording: ${recordingId}, marking as permanently failed`);
           }
+        } catch (updateError) {
+          console.error(`❌ Failed to update recording after analysis error:`, updateError);
         }
         
         throw error;
