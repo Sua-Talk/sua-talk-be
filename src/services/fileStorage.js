@@ -398,6 +398,67 @@ class FileStorageService {
   }
 
   /**
+   * Download file from cloud storage (Minio) to local path
+   * @param {string} objectKey - Object key in cloud storage
+   * @param {string} localPath - Local file path to save to
+   * @returns {Object} - Download result
+   */
+  async downloadFile(objectKey, localPath) {
+    try {
+      // Check if we're in production with cloud storage
+      if (process.env.NODE_ENV !== 'production' || !process.env.MINIO_ENDPOINT) {
+        throw new Error('Cloud storage not configured for this environment');
+      }
+
+      const AWS = require('aws-sdk');
+      
+      // Configure S3 client for Minio
+      const s3Client = new AWS.S3({
+        endpoint: process.env.MINIO_ENDPOINT,
+        accessKeyId: process.env.MINIO_ACCESS_KEY,
+        secretAccessKey: process.env.MINIO_SECRET_KEY,
+        s3ForcePathStyle: true,
+        signatureVersion: 'v4',
+        region: process.env.MINIO_REGION || 'us-east-1'
+      });
+
+      const bucketName = process.env.MINIO_BUCKET_NAME || 'suatalk-files';
+
+      console.log(`📥 Downloading ${objectKey} from bucket ${bucketName} to ${localPath}`);
+
+      // Get object from Minio
+      const params = {
+        Bucket: bucketName,
+        Key: objectKey
+      };
+
+      const data = await s3Client.getObject(params).promise();
+      
+      // Write to local file
+      const fs = require('fs').promises;
+      await fs.writeFile(localPath, data.Body);
+
+      console.log(`✅ Successfully downloaded ${objectKey} to ${localPath}`);
+
+      return {
+        success: true,
+        localPath,
+        objectKey,
+        size: data.Body.length
+      };
+
+    } catch (error) {
+      console.error(`❌ Failed to download file ${objectKey}:`, error);
+      return {
+        success: false,
+        error: error.message,
+        objectKey,
+        localPath
+      };
+    }
+  }
+
+  /**
    * Get storage statistics
    * @returns {Object} - Storage stats
    */

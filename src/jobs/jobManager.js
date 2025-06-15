@@ -126,10 +126,33 @@ class JobManager {
         let audioFilePath;
         
         if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
-          // For cloud storage URLs, we'll need to download the file first
-          // This is a simplified version - you might want to implement file streaming
+          // For cloud storage URLs, extract the object key and download the file
           console.log(`📁 Audio file stored in cloud storage: ${recording.filePath}`);
-          throw new Error('Cloud storage file analysis not yet implemented');
+          
+          // Extract object key from URL (e.g., "audio-recordings/filename.wav")
+          const urlParts = recording.filePath.split('/');
+          const bucketIndex = urlParts.findIndex(part => part === 'suatalk-files');
+          const objectKey = urlParts.slice(bucketIndex + 1).join('/');
+          
+          console.log(`🔑 Extracting object key: ${objectKey}`);
+          
+          // Create temporary file path for download
+          const tempDir = path.join(process.cwd(), 'temp');
+          if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+          }
+          
+          const tempFileName = `temp_${Date.now()}_${path.basename(objectKey)}`;
+          audioFilePath = path.join(tempDir, tempFileName);
+          
+          // Download file from Minio to temporary location
+          const downloadResult = await fileStorageService.downloadFile(objectKey, audioFilePath);
+          
+          if (!downloadResult.success) {
+            throw new Error(`Failed to download audio file: ${downloadResult.error}`);
+          }
+          
+          console.log(`📥 Downloaded audio file to: ${audioFilePath}`);
         } else {
           // Local file path
           audioFilePath = path.resolve(recording.filePath);
@@ -202,6 +225,18 @@ class JobManager {
 
         console.log(`✅ Audio analysis completed for recording: ${recordingId}`);
         console.log(`🎯 Prediction: ${prediction.prediction} (confidence: ${(prediction.confidence * 100).toFixed(1)}%)`);
+
+        // Cleanup temporary file if it was downloaded from cloud storage
+        if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http') && audioFilePath) {
+          try {
+            if (fs.existsSync(audioFilePath)) {
+              fs.unlinkSync(audioFilePath);
+              console.log(`🗑️ Cleaned up temporary file: ${audioFilePath}`);
+            }
+          } catch (cleanupError) {
+            console.warn(`⚠️ Failed to cleanup temporary file: ${cleanupError.message}`);
+          }
+        }
 
         return updatedRecording;
         
