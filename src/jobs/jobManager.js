@@ -165,7 +165,11 @@ class JobManager {
         console.log(`🔍 Analyzing audio file: ${audioFilePath}`);
         
         // Prepare metadata for enhanced ML prediction
-        const dateOfBirth = recording.babyId.birthDate.toISOString();
+        // Format date as YYYYMMDD for ML service compatibility
+        const birthDate = new Date(recording.babyId.birthDate);
+        const dateOfBirth = birthDate.getFullYear().toString() + 
+          (birthDate.getMonth() + 1).toString().padStart(2, '0') + 
+          birthDate.getDate().toString().padStart(2, '0');
         const babyId = recording.babyId._id.toString();
         
         // Get historical analysis data for this baby (last 10 recordings)
