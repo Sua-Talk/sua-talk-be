@@ -19,7 +19,17 @@ const s3Config = {
   region: process.env.MINIO_REGION || 'us-east-1', // Default region for Minio
   apiVersion: '2006-03-01', // Ensure AWS SDK v2 compatibility
   sslEnabled: false, // Disable SSL for internal CapRover communication
-  s3DisableBodySigning: true // Improve performance for Minio
+  s3DisableBodySigning: true, // Improve performance for Minio
+  maxRetries: 3, // Add retry logic
+  retryDelayOptions: {
+    customBackoff: function(retryCount) {
+      return Math.pow(2, retryCount) * 100; // Exponential backoff
+    }
+  },
+  httpOptions: {
+    timeout: 30000, // 30 second timeout
+    connectTimeout: 5000 // 5 second connect timeout
+  }
 };
 
 // Validate required configuration
@@ -60,66 +70,96 @@ const generateSecureFilename = (originalName, prefix = 'file', userId = null) =>
 };
 
 /**
- * S3 Storage for Baby Photos
+ * S3 Storage for Baby Photos with improved error handling
  */
 const babyPhotoStorage = multerS3({
   s3: s3,
   bucket: BUCKET_NAME,
   key: function (req, file, cb) {
-    const babyId = req.params.id;
-    const filename = generateSecureFilename(file.originalname, 'baby', babyId);
-    cb(null, `baby-photos/${filename}`);
+    try {
+      const babyId = req.params.id;
+      const filename = generateSecureFilename(file.originalname, 'baby', babyId);
+      cb(null, `baby-photos/${filename}`);
+    } catch (error) {
+      console.error('Error generating baby photo key:', error);
+      cb(error);
+    }
   },
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: function (req, file, cb) {
-    cb(null, {
-      fieldName: file.fieldname,
-      userId: req.user._id.toString(),
-      babyId: req.params.id || '',
-      uploadDate: new Date().toISOString()
-    });
+    try {
+      cb(null, {
+        fieldName: file.fieldname,
+        userId: req.user._id.toString(),
+        babyId: req.params.id || '',
+        uploadDate: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error setting baby photo metadata:', error);
+      cb(null, {}); // Continue with empty metadata
+    }
   }
 });
 
 /**
- * S3 Storage for Audio Recordings
+ * S3 Storage for Audio Recordings with improved error handling
  */
 const audioStorage = multerS3({
   s3: s3,
   bucket: BUCKET_NAME,
   key: function (req, file, cb) {
-    const userId = req.user._id;
-    const filename = generateSecureFilename(file.originalname, 'audio', userId);
-    cb(null, `audio-recordings/${filename}`);
+    try {
+      const userId = req.user._id;
+      const filename = generateSecureFilename(file.originalname, 'audio', userId);
+      cb(null, `audio-recordings/${filename}`);
+    } catch (error) {
+      console.error('Error generating audio key:', error);
+      cb(error);
+    }
   },
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: function (req, file, cb) {
-    cb(null, {
-      fieldName: file.fieldname,
-      userId: req.user._id.toString(),
-      uploadDate: new Date().toISOString()
-    });
+    try {
+      cb(null, {
+        fieldName: file.fieldname,
+        userId: req.user._id.toString(),
+        uploadDate: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error setting audio metadata:', error);
+      cb(null, {}); // Continue with empty metadata
+    }
   }
 });
 
 /**
- * S3 Storage for User Avatars
+ * S3 Storage for User Avatars with improved error handling
  */
 const avatarStorage = multerS3({
   s3: s3,
   bucket: BUCKET_NAME,
   key: function (req, file, cb) {
-    const userId = req.user._id;
-    const filename = generateSecureFilename(file.originalname, 'avatar', userId);
-    cb(null, `avatars/${filename}`);
+    try {
+      const userId = req.user._id;
+      const filename = generateSecureFilename(file.originalname, 'avatar', userId);
+      cb(null, `avatars/${filename}`);
+    } catch (error) {
+      console.error('Error generating avatar key:', error);
+      cb(error);
+    }
   },
   contentType: multerS3.AUTO_CONTENT_TYPE,
   metadata: function (req, file, cb) {
-    cb(null, {
-      fieldName: file.fieldname,
-      userId: req.user._id.toString(),
-      uploadDate: new Date().toISOString()
-    });
+    try {
+      cb(null, {
+        fieldName: file.fieldname,
+        userId: req.user._id.toString(),
+        uploadDate: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error setting avatar metadata:', error);
+      cb(null, {}); // Continue with empty metadata
+    }
   }
 });
 
@@ -153,14 +193,19 @@ const audioFileFilter = (req, file, cb) => {
 };
 
 /**
- * Multer configurations
+ * Multer configurations with improved limits and error handling
  */
 const photoUpload = multer({
   storage: babyPhotoStorage,
   fileFilter: imageFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1
+    files: 1,
+    fields: 10,
+    fieldNameSize: 100,
+    fieldSize: 1024 * 100,
+    parts: 15,
+    headerPairs: 2000
   }
 });
 
@@ -169,7 +214,12 @@ const audioUpload = multer({
   fileFilter: audioFileFilter,
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
-    files: 1
+    files: 1,
+    fields: 10,
+    fieldNameSize: 100,
+    fieldSize: 1024 * 1024,
+    parts: 20,
+    headerPairs: 2000
   }
 });
 
@@ -178,7 +228,12 @@ const avatarUpload = multer({
   fileFilter: imageFileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 1
+    files: 1,
+    fields: 5,
+    fieldNameSize: 100,
+    fieldSize: 1024 * 50,
+    parts: 10,
+    headerPairs: 2000
   }
 });
 

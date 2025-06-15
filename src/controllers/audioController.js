@@ -30,7 +30,9 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   if (!baby) {
     // Clean up uploaded file if baby validation fails
     try {
-      fs.unlinkSync(req.file.path);
+      if (req.file.path) {
+        fs.unlinkSync(req.file.path);
+      }
     } catch (cleanupError) {
       console.error('Error cleaning up file:', cleanupError);
     }
@@ -38,11 +40,26 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   }
 
   try {
+    // Handle file path - for cloud storage it might be undefined
+    let filePath = '';
+    if (req.file.path) {
+      filePath = path.relative(process.cwd(), req.file.path);
+    } else if (req.file.location) {
+      // For cloud storage (S3/Minio), use location
+      filePath = req.file.location;
+    } else if (req.file.key) {
+      // For S3/Minio, use key
+      filePath = req.file.key;
+    } else {
+      // Fallback to filename
+      filePath = `audio-recordings/${req.file.filename}`;
+    }
+
     // Prepare audio recording data
     const audioData = {
       filename: req.file.filename,
       originalName: req.file.originalname,
-      filePath: path.relative(process.cwd(), req.file.path),
+      filePath: filePath,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       babyId: babyId,
@@ -142,7 +159,9 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   } catch (dbError) {
     // Clean up uploaded file if database operation fails
     try {
-      fs.unlinkSync(req.file.path);
+      if (req.file && req.file.path) {
+        fs.unlinkSync(req.file.path);
+      }
     } catch (cleanupError) {
       console.error('Error cleaning up file:', cleanupError);
     }
