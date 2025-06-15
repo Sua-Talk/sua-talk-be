@@ -283,7 +283,11 @@ const getAllRecordings = asyncHandler(async (req, res) => {
     mlAnalysis: recording.analysisStatus === 'completed' && recording.mlAnalysis ? {
       prediction: recording.mlAnalysis.prediction,
       confidence: recording.mlAnalysis.confidence,
-      allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map())
+      allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map()),
+      // Include AI enhancement data
+      aiRecommendation: recording.mlAnalysis.aiRecommendation,
+      historySummary: recording.mlAnalysis.historySummary,
+      babyAge: recording.mlAnalysis.babyAge
     } : null,
     recordingContext: recording.recordingContext,
     uploadedAt: recording.analysisMetadata.uploadedAt,
@@ -352,7 +356,11 @@ const getRecordingById = asyncHandler(async (req, res) => {
       prediction: recording.mlAnalysis.prediction,
       confidence: recording.mlAnalysis.confidence,
       allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map()),
-      featureShape: recording.mlAnalysis.featureShape
+      featureShape: recording.mlAnalysis.featureShape,
+      // Include AI enhancement data
+      aiRecommendation: recording.mlAnalysis.aiRecommendation,
+      historySummary: recording.mlAnalysis.historySummary,
+      babyAge: recording.mlAnalysis.babyAge
     } : null,
     audioMetadata: recording.audioMetadata,
     recordingContext: recording.recordingContext,

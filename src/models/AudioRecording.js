@@ -57,7 +57,7 @@ const audioRecordingSchema = new mongoose.Schema({
   mlAnalysis: {
     prediction: {
       type: String,
-      enum: ['burping', 'discomfort', 'belly_pain', 'hungry', 'tired'],
+      enum: ['sakit perut', 'kembung', 'tidak nyaman', 'lapar', 'lelah'],
       default: null
     },
     confidence: {
@@ -71,7 +71,21 @@ const audioRecordingSchema = new mongoose.Schema({
       of: Number,
       default: null
     },
-    featureShape: [Number] // e.g., [1, 167]
+    featureShape: [Number], // e.g., [1, 167]
+    // AI Enhancement Fields
+    aiRecommendation: {
+      type: String,
+      default: null
+    },
+    historySummary: {
+      type: String,
+      default: null
+    },
+    babyAge: {
+      years: { type: Number, default: null },
+      months: { type: Number, default: null },
+      totalDays: { type: Number, default: null }
+    }
   },
   // ML Service metadata
   mlServiceResponse: {
@@ -233,7 +247,11 @@ audioRecordingSchema.methods.updateMLAnalysisResult = function(mlResult, process
     prediction: mlResult.prediction,
     confidence: mlResult.confidence,
     allPredictions: new Map(Object.entries(mlResult.all_predictions || {})),
-    featureShape: mlResult.feature_shape || []
+    featureShape: mlResult.feature_shape || [],
+    // Include AI enhancement data
+    aiRecommendation: mlResult['ai-recommendation'] || null,
+    historySummary: mlResult.history_summary || null,
+    babyAge: mlResult.age || null
   };
   this.analysisMetadata.analyzedAt = new Date();
   

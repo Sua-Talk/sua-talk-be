@@ -235,7 +235,11 @@ const getMLAnalysisResult = asyncHandler(async (req, res) => {
         prediction: recording.mlAnalysis.prediction,
         confidence: recording.mlAnalysis.confidence,
         allPredictions: Object.fromEntries(recording.mlAnalysis.allPredictions || new Map()),
-        featureShape: recording.mlAnalysis.featureShape
+        featureShape: recording.mlAnalysis.featureShape,
+        // Include AI enhancement data
+        aiRecommendation: recording.mlAnalysis.aiRecommendation,
+        historySummary: recording.mlAnalysis.historySummary,
+        babyAge: recording.mlAnalysis.babyAge
       };
       response.data.processingTime = recording.mlServiceResponse?.processingTime;
     }

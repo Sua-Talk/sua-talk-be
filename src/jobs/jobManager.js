@@ -215,6 +215,10 @@ class JobManager {
           'mlAnalysis.confidence': prediction.confidence,
           'mlAnalysis.allPredictions': new Map(Object.entries(prediction.all_predictions || {})),
           'mlAnalysis.featureShape': prediction.feature_shape,
+          // Store AI enhancement data
+          'mlAnalysis.aiRecommendation': prediction['ai-recommendation'] || null,
+          'mlAnalysis.historySummary': prediction.history_summary || null,
+          'mlAnalysis.babyAge': prediction.age || null,
           'mlServiceResponse.modelVersion': prediction.model_version || 'unknown',
           'mlServiceResponse.processingTime': prediction.processing_time || null,
           'mlServiceResponse.rawResponse': prediction,
