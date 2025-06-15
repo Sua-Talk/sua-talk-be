@@ -9,18 +9,40 @@ const path = require('path');
  * Using S3-compatible storage via Minio instance
  */
 
-// Configure S3 client for Minio
+// Configure S3 client for Minio with AWS SDK v2
 const s3Config = {
   endpoint: process.env.MINIO_ENDPOINT || 'http://srv-captain--minio:9000',
   accessKeyId: process.env.MINIO_ACCESS_KEY,
   secretAccessKey: process.env.MINIO_SECRET_KEY,
   s3ForcePathStyle: true, // Required for Minio
   signatureVersion: 'v4',
-  region: process.env.MINIO_REGION || 'us-east-1' // Default region for Minio
+  region: process.env.MINIO_REGION || 'us-east-1', // Default region for Minio
+  apiVersion: '2006-03-01', // Ensure AWS SDK v2 compatibility
+  sslEnabled: false, // Disable SSL for internal CapRover communication
+  s3DisableBodySigning: true // Improve performance for Minio
 };
 
-// Create S3 instance
-const s3 = new AWS.S3(s3Config);
+// Validate required configuration
+const requiredEnvVars = ['MINIO_ACCESS_KEY', 'MINIO_SECRET_KEY'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error(`❌ Missing required Minio environment variables: ${missingVars.join(', ')}`);
+  console.error('📋 Please check CAPROVER_ENV_SETUP.md for required environment variables');
+  throw new Error(`Missing Minio configuration: ${missingVars.join(', ')}`);
+}
+
+// Create S3 instance with error handling
+let s3;
+try {
+  s3 = new AWS.S3(s3Config);
+  console.log(`✅ Minio S3 client initialized`);
+  console.log(`🔗 Endpoint: ${s3Config.endpoint}`);
+  console.log(`🪣 Bucket: ${process.env.MINIO_BUCKET_NAME || 'suatalk-files'}`);
+} catch (error) {
+  console.error(`❌ Failed to initialize Minio S3 client:`, error);
+  throw error;
+}
 
 // Bucket configuration
 const BUCKET_NAME = process.env.MINIO_BUCKET_NAME || 'suatalk-files';
@@ -115,15 +137,18 @@ const imageFileFilter = (req, file, cb) => {
 };
 
 /**
- * File filter for audio
+ * File filter for audio files
  */
 const audioFileFilter = (req, file, cb) => {
-  const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/m4a', 'audio/flac'];
+  const allowedTypes = [
+    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 
+    'audio/wave', 'audio/x-wave', 'audio/webm', 'audio/ogg'
+  ];
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid audio type. Only WAV, MP3, M4A, and FLAC files are allowed.'), false);
+    cb(new Error('Invalid file type. Only MP3, WAV, WebM, and OGG audio files are allowed.'), false);
   }
 };
 
@@ -162,11 +187,13 @@ const avatarUpload = multer({
  */
 const createBucketIfNotExists = async () => {
   try {
+    console.log(`🔍 Checking if bucket ${BUCKET_NAME} exists...`);
     await s3.headBucket({ Bucket: BUCKET_NAME }).promise();
     console.log(`✅ Bucket ${BUCKET_NAME} exists`);
   } catch (error) {
     if (error.statusCode === 404) {
       try {
+        console.log(`📦 Creating bucket ${BUCKET_NAME}...`);
         await s3.createBucket({ Bucket: BUCKET_NAME }).promise();
         console.log(`✅ Bucket ${BUCKET_NAME} created successfully`);
       } catch (createError) {
@@ -234,6 +261,21 @@ const getStorageStats = async () => {
   }
 };
 
+/**
+ * Test Minio connection
+ */
+const testConnection = async () => {
+  try {
+    console.log(`🧪 Testing Minio connection...`);
+    await s3.listBuckets().promise();
+    console.log(`✅ Minio connection successful`);
+    return { success: true };
+  } catch (error) {
+    console.error(`❌ Minio connection failed:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   s3,
   BUCKET_NAME,
@@ -244,6 +286,7 @@ module.exports = {
   deleteFile,
   getFileUrl,
   getStorageStats,
+  testConnection,
   uploadBabyPhoto: photoUpload.single('photo'),
   uploadAudioRecording: audioUpload.single('audio'),
   uploadAvatar: avatarUpload.single('avatar')

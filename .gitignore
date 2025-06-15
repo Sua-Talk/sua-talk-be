@@ -35,3 +35,5 @@ uploads/
 
 sua-talk-ml/
 final_review_gate.py
+.env.production
+docs/CAPROVER_ENV_SETUP.md

@@ -33,7 +33,7 @@ RESEND_API_KEY=re_your_resend_api_key_here
 EMAIL_FROM=noreply@suatalk.site
 SMTP_FROM_NAME=SuaTalk Team
 
-# File Storage (Minio S3 di CapRover)
+# File Storage (Minio S3 di CapRover) - WAJIB UNTUK PRODUCTION
 MINIO_ENDPOINT=http://srv-captain--minio:9000
 MINIO_ACCESS_KEY=your-minio-access-key
 MINIO_SECRET_KEY=your-minio-secret-key
@@ -103,12 +103,62 @@ Untuk mendapatkan **MINIO_ACCESS_KEY** dan **MINIO_SECRET_KEY**:
 3. **Copy** nilai `MINIO_ROOT_USER` → set as `MINIO_ACCESS_KEY`
 4. **Copy** nilai `MINIO_ROOT_PASSWORD` → set as `MINIO_SECRET_KEY`
 
+## 🚨 **Troubleshooting Storage Errors:**
+
+### Error: `TypeError: this.client.send is not a function`
+
+**Penyebab:**
+- Missing environment variables `MINIO_ACCESS_KEY` atau `MINIO_SECRET_KEY`
+- Minio service tidak running atau tidak accessible
+- Network connectivity issue between backend dan Minio
+
+**Solusi:**
+1. **Cek Environment Variables** di CapRover:
+   ```bash
+   # Pastikan variables ini ada dan tidak kosong
+   MINIO_ACCESS_KEY=xxxxx
+   MINIO_SECRET_KEY=xxxxx
+   MINIO_ENDPOINT=http://srv-captain--minio:9000
+   ```
+
+2. **Restart Backend App** setelah update environment variables
+
+3. **Cek Minio Service Status:**
+   - Go to CapRover → Apps → **minio**
+   - Pastikan status **Running** (green)
+   - Check logs untuk error
+
+4. **Test Manual Connection** via CapRover shell:
+   ```bash
+   curl http://srv-captain--minio:9000/minio/health/live
+   ```
+
+### Fallback ke Local Storage
+
+Jika Minio tetap error, backend akan otomatis fallback ke local storage dengan log:
+```
+⚠️ Minio storage initialization failed
+📁 Application will continue with local storage fallback
+```
+
+**Note:** Local storage tidak persistent di CapRover containers.
+
 ## 🛡️ **Security Notes:**
 
 - ✅ **Jangan hardcode** secrets di kode
 - ✅ **Use environment variables** untuk semua credentials
 - ✅ **Generate unique secrets** untuk setiap environment
 - ✅ **Keep secrets secure** dan jangan share di public
+
+## 📝 **Deployment Checklist:**
+
+- [ ] MongoDB service running di CapRover
+- [ ] Minio service running di CapRover  
+- [ ] ML service running di CapRover
+- [ ] Environment variables properly set
+- [ ] Backend app deployed dan running
+- [ ] Test file upload functionality
+- [ ] Check logs for any errors
 
 ---
 

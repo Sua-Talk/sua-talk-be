@@ -366,12 +366,33 @@ if (require.main === module) {
     if (process.env.NODE_ENV === 'production') {
       try {
         const storageConfig = require('./config/storage');
-        await storageConfig.createBucketIfNotExists();
-        console.log('✅ Minio storage initialized');
+        
+        // Test connection first
+        const connectionTest = await storageConfig.testConnection();
+        if (!connectionTest.success) {
+          console.warn('⚠️ Minio connection test failed:', connectionTest.error);
+          console.warn('📁 Application will use local storage fallback');
+        } else {
+          // Create bucket if connection is successful
+          await storageConfig.createBucketIfNotExists();
+          console.log('✅ Minio storage initialized successfully');
+        }
       } catch (error) {
         console.warn('⚠️ Minio storage initialization failed:', error.message);
-        console.warn('📁 Falling back to local storage for development');
+        console.warn('📁 Application will continue with local storage fallback');
+        
+        // Check if the error is due to missing environment variables
+        if (error.message.includes('Missing Minio configuration')) {
+          console.error('🔧 Please check your environment variables:');
+          console.error('   - MINIO_ACCESS_KEY');
+          console.error('   - MINIO_SECRET_KEY');
+          console.error('   - MINIO_ENDPOINT (optional)');
+          console.error('   - MINIO_BUCKET_NAME (optional)');
+          console.error('📋 See CAPROVER_ENV_SETUP.md for complete setup instructions');
+        }
       }
+    } else {
+      console.log('🔧 Development mode: using local file storage');
     }
     
     app.listen(PORT, () => {
