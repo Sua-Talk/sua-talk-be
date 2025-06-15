@@ -17,10 +17,14 @@ AudioRecording:
       type: string
       example: "507f1f77bcf86cd799439009"
       description: "ID of the user who uploaded the recording"
-    fileName:
+    filename:
       type: string
       example: "recording_20240115_183000.wav"
-      description: "Original filename"
+      description: "Generated filename for storage"
+    originalName:
+      type: string
+      example: "baby_cry_evening.wav"
+      description: "Original filename from upload"
     fileUrl:
       type: string
       example: "https://api.suatalk.site/uploads/audio/recording123.wav"

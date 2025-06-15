@@ -38,3 +38,15 @@ final_review_gate.py
 .env.production
 docs/CAPROVER_ENV_SETUP.md
 docs/FRONTEND_JWT_GUIDE.md
+.roomodes
+.windsurfrules
+.roo/rules/dev_workflow.md
+.roo/rules/roo_rules.md
+.roo/rules/self_improve.md
+.roo/rules/taskmaster.md
+.roo/rules-architect/architect-rules
+.roo/rules-ask/ask-rules
+.roo/rules-boomerang/boomerang-rules
+.roo/rules-code/code-rules
+.roo/rules-debug/debug-rules
+.roo/rules-test/test-rules

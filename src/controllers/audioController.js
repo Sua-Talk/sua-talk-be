@@ -15,6 +15,13 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   const { babyId, duration, recordingContext } = req.body;
 
+  // Debug logging for troubleshooting
+  console.log('=== Audio Upload Debug ===');
+  console.log('req.file:', req.file);
+  console.log('req.body:', req.body);
+  console.log('req.headers:', req.headers);
+  console.log('========================');
+
   // Check if account is active
   if (!req.user.isActive) {
     return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
@@ -23,6 +30,13 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   // Check if file was uploaded
   if (!req.file) {
     return sendErrorResponse(res, 400, 'No audio file provided', 'NO_FILE_PROVIDED');
+  }
+
+  // Validate that file has required properties
+  if (!req.file.filename && !req.file.originalname) {
+    console.error('❌ File upload failed: Missing filename and originalname');
+    console.error('req.file content:', JSON.stringify(req.file, null, 2));
+    return sendErrorResponse(res, 400, 'File upload failed: Missing file information', 'INVALID_FILE_UPLOAD');
   }
 
   // Validate baby ownership
@@ -52,13 +66,35 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       filePath = req.file.key;
     } else {
       // Fallback to filename
-      filePath = `audio-recordings/${req.file.filename}`;
+      filePath = `audio-recordings/${req.file.filename || req.file.originalname}`;
+    }
+
+    // Ensure we have a filename - use originalname as fallback
+    let filename = req.file.filename; // This is undefined for multer-s3
+    let originalName = req.file.originalname;
+    
+    // For multer-s3, extract filename from key
+    if (!filename && req.file.key) {
+      // Extract filename from S3 key (e.g., "audio-recordings/audio-userId-timestamp-hash.wav")
+      filename = path.basename(req.file.key);
+    }
+    
+    // If still no filename, generate one
+    if (!filename) {
+      const timestamp = Date.now();
+      const extension = path.extname(originalName || '.wav');
+      filename = `audio-${timestamp}${extension}`;
+    }
+    
+    // Ensure we have originalName
+    if (!originalName) {
+      originalName = filename;
     }
 
     // Prepare audio recording data
     const audioData = {
-      filename: req.file.filename,
-      originalName: req.file.originalname,
+      filename: filename,
+      originalName: originalName,
       filePath: filePath,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
@@ -66,6 +102,8 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       userId: userId,
       analysisStatus: 'pending'
     };
+
+    console.log('📝 Audio data to save:', audioData);
 
     // Add duration if provided
     if (duration && !isNaN(parseFloat(duration))) {
@@ -157,6 +195,15 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     });
 
   } catch (dbError) {
+    // Log the full error for debugging
+    console.error('❌ Database error during audio upload:', dbError);
+    console.error('Error details:', {
+      name: dbError.name,
+      message: dbError.message,
+      code: dbError.code,
+      stack: dbError.stack
+    });
+
     // Clean up uploaded file if database operation fails
     try {
       if (req.file && req.file.path) {
