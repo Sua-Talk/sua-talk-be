@@ -948,11 +948,23 @@ const streamAudio = asyncHandler(async (req, res) => {
 
   try {
     // Set CORS headers for audio streaming
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'http://localhost:5173',
+      'https://suatalk.site',
+      'https://www.suatalk.site'
+    ];
+    
+    const corsOrigin = allowedOrigins.includes(origin) ? origin : '*';
+    
     res.set({
-      'Access-Control-Allow-Origin': req.headers.origin || '*',
+      'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
-      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
       'Content-Type': recording.mimeType || 'audio/mpeg',
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'private, max-age=3600',
@@ -961,12 +973,25 @@ const streamAudio = asyncHandler(async (req, res) => {
 
     // Handle cloud storage URLs
     if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
-      // For cloud storage, redirect to the signed URL
+      // For cloud storage, return signed URL instead of redirecting
+      // This avoids CORS issues with redirect
       const fileStorageService = require('../services/fileStorage');
       const signedUrl = await fileStorageService.getSignedUrl(recording.filePath);
       
       if (signedUrl) {
-        return res.redirect(302, signedUrl);
+        // Instead of redirecting, return the signed URL in JSON
+        // Frontend can then make a direct request to this URL
+        return res.json({
+          success: true,
+          data: {
+            streamUrl: signedUrl,
+            mimeType: recording.mimeType || 'audio/mpeg',
+            filename: recording.originalName || 'audio.mp3',
+            duration: recording.duration,
+            recordingId: recording._id
+          },
+          message: 'Stream URL generated successfully'
+        });
       } else {
         return sendErrorResponse(res, 500, 'Failed to generate signed URL', 'SIGNED_URL_ERROR');
       }
@@ -1014,6 +1039,69 @@ const streamAudio = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Get streaming URL for audio file (no redirect, CORS-friendly)
+ * @route GET /api/audio/stream-url/:id
+ * @access Private
+ */
+const getStreamUrl = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const recordingId = req.params.id;
+
+  // Check if account is active
+  if (!req.user.isActive) {
+    return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
+  }
+
+  // Find recording and verify ownership
+  const recording = await AudioRecording.findOne({ 
+    _id: recordingId, 
+    userId, 
+    isActive: true 
+  });
+
+  if (!recording) {
+    return sendErrorResponse(res, 404, 'Audio recording not found', 'RECORDING_NOT_FOUND');
+  }
+
+  try {
+    // Handle cloud storage URLs
+    if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
+      const fileStorageService = require('../services/fileStorage');
+      const signedUrl = await fileStorageService.getSignedUrl(recording.filePath);
+      
+      if (signedUrl) {
+        return sendSuccessResponse(res, 200, 'Stream URL generated successfully', {
+          streamUrl: signedUrl,
+          mimeType: recording.mimeType || 'audio/mpeg',
+          filename: recording.originalName || 'audio.mp3',
+          duration: recording.duration,
+          recordingId: recording._id,
+          expiresIn: '1 hour'
+        });
+      } else {
+        return sendErrorResponse(res, 500, 'Failed to generate signed URL', 'SIGNED_URL_ERROR');
+      }
+    }
+
+    // For local file storage, return the stream endpoint
+    const streamUrl = `${req.protocol}://${req.get('host')}/audio/stream/${recordingId}`;
+    
+    return sendSuccessResponse(res, 200, 'Stream URL generated successfully', {
+      streamUrl: streamUrl,
+      mimeType: recording.mimeType || 'audio/mpeg',
+      filename: recording.originalName || 'audio.mp3',
+      duration: recording.duration,
+      recordingId: recording._id,
+      note: 'This URL requires Authorization header for access'
+    });
+
+  } catch (error) {
+    console.error('Error generating stream URL:', error);
+    return sendErrorResponse(res, 500, 'Failed to generate stream URL', 'STREAM_URL_ERROR');
+  }
+});
+
 module.exports = {
   uploadAudioRecording,
   getAllRecordings,
@@ -1022,5 +1110,6 @@ module.exports = {
   batchTriggerAnalysis,
   deleteRecording,
   cleanupAudioFiles,
-  streamAudio
+  streamAudio,
+  getStreamUrl
 }; 

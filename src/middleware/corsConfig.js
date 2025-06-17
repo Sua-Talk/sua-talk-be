@@ -30,7 +30,7 @@ const getAllowedOrigins = () => {
     origins.push(
       'https://suatalk.site',
       'https://www.suatalk.site',
-      'https://api.suatalk.site',
+      'https://api.suatalk.site',  // For Swagger UI and API docs
       'http://localhost:3000'
     );
     

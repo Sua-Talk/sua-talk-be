@@ -557,6 +557,100 @@ paths:
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /audio/stream-url/{id}:
+    get:
+      tags:
+        - Audio
+      summary: Get audio streaming URL (CORS-friendly)
+      description: |
+        Get a streaming URL for an audio recording without redirect. This is a 
+        CORS-friendly alternative to the `/audio/stream/{id}` endpoint that avoids 
+        redirect issues when called from web applications.
+        
+        **Use this endpoint when:**
+        - Making requests from web browsers with CORS
+        - You need the streaming URL to handle in your application
+        - Avoiding redirect-related CORS issues
+        
+        **For cloud storage:** Returns a signed URL that can be accessed directly.
+        **For local storage:** Returns the API endpoint URL with auth requirements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Audio recording ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Stream URL generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Stream URL generated successfully
+                  data:
+                    type: object
+                    properties:
+                      streamUrl:
+                        type: string
+                        example: https://storage.suatalk.com/audio/signed-url-here?expires=...
+                        description: Direct streaming URL (signed for cloud storage)
+                      mimeType:
+                        type: string
+                        example: audio/mpeg
+                        description: Audio file MIME type
+                      filename:
+                        type: string
+                        example: baby_cry_recording.mp3
+                        description: Original filename
+                      duration:
+                        type: number
+                        example: 45.2
+                        description: Audio duration in seconds
+                      recordingId:
+                        type: string
+                        example: 507f1f77bcf86cd799439011
+                        description: Audio recording ID
+                      expiresIn:
+                        type: string
+                        example: 1 hour
+                        description: How long the URL remains valid (cloud storage only)
+                      note:
+                        type: string
+                        example: This URL requires Authorization header for access
+                        description: Additional usage notes (local storage only)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          description: Failed to generate stream URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Failed to generate signed URL
+                  error:
+                    type: string
+                    example: SIGNED_URL_ERROR
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /audio/pending-analysis:
     get:
       tags:

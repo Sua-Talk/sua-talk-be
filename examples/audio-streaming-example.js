@@ -1,214 +1,201 @@
 /**
- * Audio Streaming Example for SuaTalk API
- * 
- * This example shows how to use the new /api/audio/stream/{id} endpoint
- * to play audio files with proper CORS handling.
+ * Audio Streaming Example for Frontend
+ * Shows how to properly stream audio from SuaTalk API
  */
 
-class AudioStreamer {
+class SuaTalkAudioPlayer {
   constructor(apiBaseUrl, authToken) {
     this.apiBaseUrl = apiBaseUrl;
     this.authToken = authToken;
+    this.currentAudio = null;
   }
 
   /**
-   * Method 1: Create HTML Audio Element with streaming URL
-   * This is the simplest approach for basic audio playback
+   * Method 1: Using /audio/stream-url (RECOMMENDED for web apps)
+   * Gets streaming URL first, then plays audio
    */
-  createAudioPlayer(recordingId, containerId) {
-    const container = document.getElementById(containerId);
-    const streamUrl = `${this.apiBaseUrl}/api/audio/stream/${recordingId}`;
-
-    const audioElement = document.createElement('audio');
-    audioElement.controls = true;
-    audioElement.preload = 'metadata'; // Only load metadata initially
-    audioElement.crossorigin = 'use-credentials'; // Important for CORS
-    
-    // Set the source with authorization header
-    audioElement.src = streamUrl;
-    
-    // Add authorization header via request interceptor
-    // Note: This might require additional setup depending on your setup
-    audioElement.addEventListener('loadstart', () => {
-      console.log('Audio loading started');
-    });
-
-    audioElement.addEventListener('error', (e) => {
-      console.error('Audio loading error:', e);
-      this.handleAudioError(e, recordingId);
-    });
-
-    container.appendChild(audioElement);
-    return audioElement;
-  }
-
-  /**
-   * Method 2: Use fetch with proper headers
-   * This gives more control over the request and error handling
-   */
-  async createStreamWithFetch(recordingId) {
+  async playAudioViaStreamUrl(recordingId) {
     try {
-      const streamUrl = `${this.apiBaseUrl}/api/audio/stream/${recordingId}`;
+      console.log('🎵 Getting stream URL for recording:', recordingId);
       
-      const response = await fetch(streamUrl, {
+      // Step 1: Get streaming URL
+      const response = await fetch(`${this.apiBaseUrl}/audio/stream-url/${recordingId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${this.authToken}`,
-          'Accept': 'audio/*'
-        },
-        credentials: 'include' // Important for CORS with cookies
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Get the blob URL for the audio
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to get stream URL');
+      }
 
-      return audioUrl;
-    } catch (error) {
-      console.error('Error streaming audio:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Method 3: Advanced player with range request support
-   * This supports seeking and partial loading
-   */
-  async createAdvancedPlayer(recordingId, containerId) {
-    const container = document.getElementById(containerId);
-    const streamUrl = `${this.apiBaseUrl}/api/audio/stream/${recordingId}`;
-
-    // Create custom audio player with range support
-    const playerDiv = document.createElement('div');
-    playerDiv.className = 'custom-audio-player';
-
-    const audioElement = document.createElement('audio');
-    audioElement.preload = 'none';
-    audioElement.crossorigin = 'use-credentials';
-
-    // Custom controls
-    const playButton = document.createElement('button');
-    playButton.textContent = 'Play';
-    playButton.onclick = () => this.togglePlay(audioElement, playButton);
-
-    const progressBar = document.createElement('input');
-    progressBar.type = 'range';
-    progressBar.min = '0';
-    progressBar.max = '100';
-    progressBar.value = '0';
-    progressBar.onchange = () => this.seekAudio(audioElement, progressBar);
-
-    const timeDisplay = document.createElement('span');
-    timeDisplay.textContent = '00:00 / 00:00';
-
-    // Add event listeners
-    audioElement.addEventListener('loadedmetadata', () => {
-      progressBar.max = audioElement.duration;
-      this.updateTimeDisplay(audioElement, timeDisplay);
-    });
-
-    audioElement.addEventListener('timeupdate', () => {
-      progressBar.value = audioElement.currentTime;
-      this.updateTimeDisplay(audioElement, timeDisplay);
-    });
-
-    // Set source with custom headers (using a proxy if needed)
-    audioElement.src = streamUrl;
-
-    playerDiv.appendChild(playButton);
-    playerDiv.appendChild(progressBar);
-    playerDiv.appendChild(timeDisplay);
-    playerDiv.appendChild(audioElement);
-
-    container.appendChild(playerDiv);
-    return { audioElement, playButton, progressBar, timeDisplay };
-  }
-
-  /**
-   * Method 4: Handle streaming with axios for better error handling
-   */
-  async streamWithAxios(recordingId) {
-    try {
-      const axios = require('axios'); // Make sure axios is installed
-
-      const response = await axios({
-        method: 'get',
-        url: `${this.apiBaseUrl}/api/audio/stream/${recordingId}`,
-        headers: {
-          'Authorization': `Bearer ${this.authToken}`
-        },
-        responseType: 'blob',
-        withCredentials: true
-      });
-
-      // Create blob URL
-      const audioBlob = new Blob([response.data], { 
-        type: response.headers['content-type'] || 'audio/mpeg' 
+      console.log('✅ Stream URL received:', data.data.streamUrl);
+      
+      // Step 2: Play audio using the URL
+      this.currentAudio = new Audio(data.data.streamUrl);
+      
+      // Set audio metadata
+      this.currentAudio.preload = 'metadata';
+      
+      // Add event listeners
+      this.currentAudio.addEventListener('loadedmetadata', () => {
+        console.log(`🎵 Audio loaded - Duration: ${this.currentAudio.duration}s`);
       });
       
-      return URL.createObjectURL(audioBlob);
+      this.currentAudio.addEventListener('canplay', () => {
+        console.log('✅ Audio ready to play');
+        this.currentAudio.play();
+      });
+      
+      this.currentAudio.addEventListener('error', (e) => {
+        console.error('❌ Audio playback error:', e);
+      });
+
+      return {
+        audio: this.currentAudio,
+        metadata: data.data,
+        success: true
+      };
+
     } catch (error) {
-      console.error('Axios streaming error:', error);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+      console.error('❌ Error playing audio via stream URL:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Method 2: Using /audio/stream directly (for development/local)
+   * Only works in development or when API returns binary directly
+   */
+  async playAudioDirectStream(recordingId) {
+    try {
+      console.log('🎵 Direct streaming audio for recording:', recordingId);
+      
+      // Check if this returns JSON (production) or binary (development)
+      const response = await fetch(`${this.apiBaseUrl}/audio/stream/${recordingId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.authToken}`,
+          'Range': 'bytes=0-1023' // Request first 1KB to test
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      throw error;
+
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        // Production mode - got JSON with signed URL
+        const data = await response.json();
+        console.log('🔄 Got JSON response, using stream URL method');
+        
+        this.currentAudio = new Audio(data.data.streamUrl);
+        this.currentAudio.play();
+        
+        return {
+          audio: this.currentAudio,
+          metadata: data.data,
+          success: true,
+          note: 'Switched to stream URL method'
+        };
+      } else {
+        // Development mode - got binary audio
+        console.log('🎵 Got binary audio, creating blob URL');
+        
+        // For range requests, need to get full file
+        const fullResponse = await fetch(`${this.apiBaseUrl}/audio/stream/${recordingId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.authToken}`
+          }
+        });
+        
+        const audioBlob = await fullResponse.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        this.currentAudio = new Audio(audioUrl);
+        this.currentAudio.play();
+        
+        // Cleanup blob URL when done
+        this.currentAudio.addEventListener('ended', () => {
+          URL.revokeObjectURL(audioUrl);
+        });
+        
+        return {
+          audio: this.currentAudio,
+          success: true,
+          note: 'Used direct binary streaming'
+        };
+      }
+
+    } catch (error) {
+      console.error('❌ Error with direct streaming:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
-  // Helper methods
-  togglePlay(audioElement, button) {
-    if (audioElement.paused) {
-      audioElement.play();
-      button.textContent = 'Pause';
-    } else {
-      audioElement.pause();
-      button.textContent = 'Play';
-    }
-  }
-
-  seekAudio(audioElement, progressBar) {
-    audioElement.currentTime = progressBar.value;
-  }
-
-  updateTimeDisplay(audioElement, timeDisplay) {
-    const current = this.formatTime(audioElement.currentTime);
-    const duration = this.formatTime(audioElement.duration);
-    timeDisplay.textContent = `${current} / ${duration}`;
-  }
-
-  formatTime(seconds) {
-    if (isNaN(seconds)) return '00:00';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  }
-
-  handleAudioError(error, recordingId) {
-    console.error(`Audio error for recording ${recordingId}:`, error);
+  /**
+   * Method 3: Smart audio player (tries best method automatically)
+   */
+  async playAudio(recordingId) {
+    console.log('🎵 Smart audio player starting for recording:', recordingId);
     
-    // Common error handling
-    switch (error.target.error.code) {
-      case error.target.error.MEDIA_ERR_ABORTED:
-        console.error('Audio playback aborted');
-        break;
-      case error.target.error.MEDIA_ERR_NETWORK:
-        console.error('Network error while loading audio');
-        break;
-      case error.target.error.MEDIA_ERR_DECODE:
-        console.error('Audio decoding error');
-        break;
-      case error.target.error.MEDIA_ERR_SRC_NOT_SUPPORTED:
-        console.error('Audio format not supported');
-        break;
-      default:
-        console.error('Unknown audio error');
-        break;
+    // Try stream-url method first (recommended)
+    let result = await this.playAudioViaStreamUrl(recordingId);
+    
+    if (!result.success) {
+      console.log('🔄 Stream URL method failed, trying direct stream...');
+      result = await this.playAudioDirectStream(recordingId);
+    }
+    
+    return result;
+  }
+
+  /**
+   * Stop current audio playback
+   */
+  stop() {
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.currentTime = 0;
+      this.currentAudio = null;
+      console.log('⏹️ Audio stopped');
+    }
+  }
+
+  /**
+   * Pause current audio
+   */
+  pause() {
+    if (this.currentAudio && !this.currentAudio.paused) {
+      this.currentAudio.pause();
+      console.log('⏸️ Audio paused');
+    }
+  }
+
+  /**
+   * Resume current audio
+   */
+  resume() {
+    if (this.currentAudio && this.currentAudio.paused) {
+      this.currentAudio.play();
+      console.log('▶️ Audio resumed');
     }
   }
 }
@@ -216,68 +203,126 @@ class AudioStreamer {
 // Usage Examples:
 
 // Example 1: Basic usage
-const streamer = new AudioStreamer('https://api.suatalk.site', 'your-jwt-token');
-
-// Create a simple audio player
-// streamer.createAudioPlayer('507f1f77bcf86cd799439011', 'audio-container');
-
-// Example 2: Using fetch
-/*
-streamer.createStreamWithFetch('507f1f77bcf86cd799439011')
-  .then(audioUrl => {
-    const audio = new Audio(audioUrl);
-    audio.controls = true;
-    document.body.appendChild(audio);
-  })
-  .catch(error => console.error('Streaming failed:', error));
-*/
-
-// Example 3: Advanced player
-// streamer.createAdvancedPlayer('507f1f77bcf86cd799439011', 'advanced-player-container');
-
-// Example 4: React component example
-/*
-const AudioPlayer = ({ recordingId, authToken }) => {
-  const [audioUrl, setAudioUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const streamer = new AudioStreamer('https://api.suatalk.site', authToken);
+async function basicExample() {
+  const player = new SuaTalkAudioPlayer('https://api.suatalk.site', 'your-jwt-token');
+  const result = await player.playAudio('6850e62ba2440c3e8076859e');
+  
+  if (result.success) {
+    console.log('🎵 Audio is playing!');
     
-    streamer.createStreamWithFetch(recordingId)
-      .then(url => {
-        setAudioUrl(url);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setLoading(false);
+    // Control playback
+    setTimeout(() => player.pause(), 5000);   // Pause after 5 seconds
+    setTimeout(() => player.resume(), 8000);  // Resume after 8 seconds
+    setTimeout(() => player.stop(), 15000);   // Stop after 15 seconds
+  } else {
+    console.error('❌ Failed to play audio:', result.error);
+  }
+}
+
+// Example 2: With HTML audio element
+async function htmlAudioExample() {
+  const audioElement = document.getElementById('audio-player');
+  const recordingId = '6850e62ba2440c3e8076859e';
+  
+  try {
+    // Get stream URL
+    const response = await fetch(`https://api.suatalk.site/audio/stream-url/${recordingId}`, {
+      headers: {
+        'Authorization': 'Bearer your-jwt-token'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      // Set audio source
+      audioElement.src = data.data.streamUrl;
+      audioElement.load();
+      
+      // Add metadata
+      audioElement.title = data.data.filename;
+      
+      // Play when ready
+      audioElement.addEventListener('canplay', () => {
+        audioElement.play();
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error:', error);
+  }
+}
+
+// Example 3: React Component
+const AudioPlayer = ({ recordingId, authToken }) => {
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const audioRef = React.useRef(null);
+
+  const playAudio = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`https://api.suatalk.site/audio/stream-url/${recordingId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
       });
 
-    return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-    };
-  }, [recordingId, authToken]);
+      const data = await response.json();
 
-  if (loading) return <div>Loading audio...</div>;
-  if (error) return <div>Error: {error}</div>;
+      if (data.success) {
+        if (audioRef.current) {
+          audioRef.current.src = data.data.streamUrl;
+          audioRef.current.load();
+          await audioRef.current.play();
+          setIsPlaying(true);
+        }
+      } else {
+        setError(data.message);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+    }
+  };
 
   return (
-    <audio 
-      controls 
-      src={audioUrl}
-      onError={(e) => setError('Audio playback failed')}
-    >
-      Your browser does not support the audio element.
-    </audio>
+    <div>
+      <audio 
+        ref={audioRef}
+        onEnded={() => setIsPlaying(false)}
+        onError={(e) => setError('Audio playback failed')}
+      />
+      
+      <button 
+        onClick={isPlaying ? stopAudio : playAudio}
+        disabled={loading}
+      >
+        {loading ? 'Loading...' : isPlaying ? 'Stop' : 'Play'}
+      </button>
+      
+      {error && <div style={{color: 'red'}}>Error: {error}</div>}
+    </div>
   );
 };
-*/
 
-// Export for use in modules
+// Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AudioStreamer;
+  module.exports = { SuaTalkAudioPlayer };
+}
+
+// Make available in browser
+if (typeof window !== 'undefined') {
+  window.SuaTalkAudioPlayer = SuaTalkAudioPlayer;
 } 

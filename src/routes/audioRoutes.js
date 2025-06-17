@@ -156,6 +156,36 @@ router.post('/cleanup',
 );
 
 /**
+ * @route OPTIONS /api/audio/stream/:id
+ * @desc Handle preflight CORS requests for audio streaming
+ * @access Public
+ */
+router.options('/stream/:id', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:5173',
+    'https://suatalk.site',
+    'https://www.suatalk.site',
+    'https://api.suatalk.site'  // Add API domain for Swagger UI
+  ];
+  
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : '*';
+  
+  res.set({
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
+    'Access-Control-Max-Age': '86400'
+  });
+  
+  res.status(204).end();
+});
+
+/**
  * @route GET /api/audio/stream/:id
  * @desc Stream audio file with CORS support
  * @access Private
@@ -167,6 +197,49 @@ router.get('/stream/:id',
   handleValidationErrors,
   securityLogger, 
   audioController.streamAudio
+);
+
+/**
+ * @route OPTIONS /api/audio/stream-url/:id
+ * @desc Handle preflight CORS requests for stream-url
+ * @access Public
+ */
+router.options('/stream-url/:id', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:5173',
+    'https://suatalk.site',
+    'https://www.suatalk.site',
+    'https://api.suatalk.site'  // Add API domain for Swagger UI
+  ];
+  
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : '*';
+  
+  res.set({
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+    'Access-Control-Max-Age': '86400'
+  });
+  
+  res.status(204).end();
+});
+
+/**
+ * @route GET /api/audio/stream-url/:id
+ * @desc Get streaming URL for audio file (CORS-friendly, no redirect)
+ * @access Private
+ */
+router.get('/stream-url/:id', 
+  profileRateLimit, 
+  authenticate, 
+  validateObjectId('id'),
+  handleValidationErrors,
+  securityLogger, 
+  audioController.getStreamUrl
 );
 
 module.exports = router; 
