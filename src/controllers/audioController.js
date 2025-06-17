@@ -1006,28 +1006,9 @@ const streamAudio = asyncHandler(async (req, res) => {
 
     // Handle cloud storage URLs
     if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
-      // For cloud storage, return signed URL instead of redirecting
-      // This avoids CORS issues with redirect
-      const fileStorageService = require('../services/fileStorage');
-      const signedUrl = await fileStorageService.getSignedUrl(recording.filePath);
-      
-      if (signedUrl) {
-        // Instead of redirecting, return the signed URL in JSON
-        // Frontend can then make a direct request to this URL
-        return res.json({
-          success: true,
-          data: {
-            streamUrl: signedUrl,
-            mimeType: recording.mimeType || 'audio/mpeg',
-            filename: recording.originalName || 'audio.mp3',
-            duration: recording.duration,
-            recordingId: recording._id
-          },
-          message: 'Stream URL generated successfully'
-        });
-      } else {
-        return sendErrorResponse(res, 500, 'Failed to generate signed URL', 'SIGNED_URL_ERROR');
-      }
+      // Redirect client to proxy endpoint that streams with correct headers & CORS
+      const proxyUrl = `${req.protocol}://${req.get('host')}/audio/proxy/${recordingId}`;
+      return res.redirect(302, proxyUrl);
     }
 
     // For local file storage
