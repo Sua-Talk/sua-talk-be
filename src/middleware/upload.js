@@ -101,14 +101,32 @@ const imageFileFilter = (req, file, cb) => {
 // File filter for audio files
 const audioFileFilter = (req, file, cb) => {
   const allowedTypes = [
-    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 
-    'audio/wave', 'audio/x-wave', 'audio/webm', 'audio/ogg'
+    // MP3 formats
+    'audio/mpeg', 'audio/mp3',
+    // WAV formats
+    'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/x-wave',
+    // M4A formats (this was missing!)
+    'audio/mp4', 'audio/m4a', 'audio/aac',
+    // WebM and OGG
+    'audio/webm', 'audio/ogg',
+    // FLAC
+    'audio/flac', 'audio/x-flac'
   ];
+  
+  console.log(`🔍 Audio file filter check:`, {
+    filename: file.originalname,
+    mimetype: file.mimetype,
+    fieldname: file.fieldname,
+    allowedTypes: allowedTypes,
+    isAllowed: allowedTypes.includes(file.mimetype)
+  });
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only MP3, WAV, WebM, and OGG audio files are allowed.'), false);
+    const error = new Error(`Invalid file type. Only MP3, WAV, M4A, WebM, OGG, and FLAC audio files are allowed. Received: ${file.mimetype}`);
+    error.code = 'INVALID_FILE_TYPE';
+    cb(error, false);
   }
 };
 
@@ -381,19 +399,37 @@ const handleUploadError = (error, req, res, next) => {
   if (error.message.includes('Invalid file type') || 
       error.message.includes('Only image files') ||
       error.message.includes('Only audio files') ||
-      error.message.includes('Invalid audio file type')) {
+      error.message.includes('Invalid audio file type') ||
+      error.code === 'INVALID_FILE_TYPE') {
     const isAudioUpload = req.route?.path?.includes('audio');
     const allowedTypes = isAudioUpload 
-      ? ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg']
+      ? [
+          'audio/mpeg', 'audio/mp3',           // MP3
+          'audio/wav', 'audio/x-wav',          // WAV
+          'audio/mp4', 'audio/m4a', 'audio/aac', // M4A/AAC
+          'audio/webm', 'audio/ogg',           // WebM/OGG
+          'audio/flac'                         // FLAC
+        ]
       : ['image/jpeg', 'image/png', 'image/webp'];
+    
+    const supportedFormats = isAudioUpload 
+      ? ['MP3', 'WAV', 'M4A', 'AAC', 'WebM', 'OGG', 'FLAC']
+      : ['JPEG', 'PNG', 'WebP'];
     
     return res.status(400).json({
       success: false,
-      message: error.message,
+      message: isAudioUpload 
+        ? `Invalid audio file type. Only ${supportedFormats.join(', ')} audio files are allowed.`
+        : `Invalid image file type. Only ${supportedFormats.join(', ')} images are allowed.`,
       error: 'INVALID_FILE_TYPE',
       details: {
         allowedTypes: allowedTypes,
-        receivedType: req.file?.mimetype || 'unknown'
+        supportedFormats: supportedFormats,
+        receivedType: req.file?.mimetype || 'unknown',
+        receivedFilename: req.file?.originalname || 'unknown',
+        hint: isAudioUpload 
+          ? 'Make sure your audio file is in one of the supported formats (MP3, WAV, M4A, AAC, WebM, OGG, FLAC)'
+          : 'Make sure your image file is in one of the supported formats (JPEG, PNG, WebP)'
       }
     });
   }

@@ -22,8 +22,8 @@
       - Request must use `multipart/form-data` content type
       - Audio file field name must be exactly "audio" 
       - Maximum file size: 50MB
-      - Maximum duration: 5 minutes (300 seconds) - **auto-validated**
-      - Supported formats: WAV, MP3, M4A, WebM, OGG, FLAC
+      - Maximum duration: 5 minutes (300 seconds)
+      - **Supported formats: MP3, WAV, M4A, AAC, WebM, OGG, FLAC**
     security:
       - bearerAuth: []
     requestBody:

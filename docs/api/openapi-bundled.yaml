@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-17T02:18:56.986Z*
+    *Last bundled: 2025-06-17T02:24:45.890Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -75,8 +75,8 @@ paths:
         - Request must use `multipart/form-data` content type
         - Audio file field name must be exactly "audio" 
         - Maximum file size: 50MB
-        - Maximum duration: 5 minutes (300 seconds) - **auto-validated**
-        - Supported formats: WAV, MP3, M4A, WebM, OGG, FLAC
+        - Maximum duration: 5 minutes (300 seconds)
+        - **Supported formats: MP3, WAV, M4A, AAC, WebM, OGG, FLAC**
       security:
         - bearerAuth: []
       requestBody:
