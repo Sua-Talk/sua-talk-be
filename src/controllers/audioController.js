@@ -1173,7 +1173,15 @@ const proxyAudioFile = asyncHandler(async (req, res) => {
       
       if (recording.filePath.startsWith('http')) {
         const url = new URL(recording.filePath);
-        objectKey = url.pathname.substring(1); // Remove leading slash
+        // Extract path and remove leading slash and bucket name
+        let pathPart = url.pathname.substring(1); // Remove leading slash
+        
+        // If path starts with bucket name, remove it (e.g., 'suatalk-files/audio-recordings/...' -> 'audio-recordings/...')
+        if (pathPart.startsWith(bucketName + '/')) {
+          pathPart = pathPart.substring(bucketName.length + 1);
+        }
+        
+        objectKey = pathPart;
       }
 
       console.log(`🔄 Proxying audio file from Minio: ${objectKey}`);

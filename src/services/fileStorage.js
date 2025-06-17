@@ -475,9 +475,19 @@ class FileStorageService {
         let objectKey = filePathOrKey;
         if (filePathOrKey.startsWith('http')) {
           const url = new URL(filePathOrKey);
-          objectKey = url.pathname.substring(1); // Remove leading slash
+          // Extract path and remove leading slash and bucket name
+          let pathPart = url.pathname.substring(1); // Remove leading slash
+          
+          // If path starts with bucket name, remove it (e.g., 'suatalk-files/audio-recordings/...' -> 'audio-recordings/...')
+          const bucketName = process.env.MINIO_BUCKET_NAME || 'suatalk-files';
+          if (pathPart.startsWith(bucketName + '/')) {
+            pathPart = pathPart.substring(bucketName.length + 1);
+          }
+          
+          objectKey = pathPart;
         }
         
+        console.log(`🔧 Extracted object key: ${objectKey} from ${filePathOrKey}`);
         return getFileUrl(objectKey, expiresIn);
       } else {
         // For local storage, return the file path as is (will be handled by streaming)
