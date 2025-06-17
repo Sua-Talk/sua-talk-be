@@ -187,7 +187,7 @@ class JobManager {
         const historyData = historicalRecordings.map(rec => ({
           prediction: rec.mlAnalysis.prediction,
           confidence: rec.mlAnalysis.confidence,
-          timestamp: rec.createdAt.toISOString(),
+          Timestamp: rec.createdAt.toISOString(),
           context: rec.recordingContext || {}
         }));
         

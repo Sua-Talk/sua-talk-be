@@ -1098,23 +1098,25 @@ const getStreamUrl = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Handle cloud storage URLs
+    // For cloud storage URLs, provide proxy endpoint instead of direct signed URL
     if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
+      // Provide proxy URL for better browser compatibility
+      const proxyUrl = `${req.protocol}://${req.get('host')}/audio/proxy/${recordingId}`;
+      
+      // Also generate signed URL as fallback
       const fileStorageService = require('../services/fileStorage');
       const signedUrl = await fileStorageService.getSignedUrl(recording.filePath);
       
-      if (signedUrl) {
-        return sendSuccessResponse(res, 200, 'Stream URL generated successfully', {
-          streamUrl: signedUrl,
-          mimeType: recording.mimeType || 'audio/mpeg',
-          filename: recording.originalName || 'audio.mp3',
-          duration: recording.duration,
-          recordingId: recording._id,
-          expiresIn: '1 hour'
-        });
-      } else {
-        return sendErrorResponse(res, 500, 'Failed to generate signed URL', 'SIGNED_URL_ERROR');
-      }
+      return sendSuccessResponse(res, 200, 'Stream URL generated successfully', {
+        streamUrl: proxyUrl, // Primary URL - proxy with better headers
+        directUrl: signedUrl, // Fallback - direct signed URL
+        mimeType: recording.mimeType || 'audio/wav',
+        filename: recording.originalName || 'audio.wav',
+        duration: recording.duration,
+        recordingId: recording._id,
+        expiresIn: '1 hour',
+        note: 'Use streamUrl for better compatibility, directUrl as fallback'
+      });
     }
 
     // For local file storage, return the stream endpoint
@@ -1122,8 +1124,8 @@ const getStreamUrl = asyncHandler(async (req, res) => {
     
     return sendSuccessResponse(res, 200, 'Stream URL generated successfully', {
       streamUrl: streamUrl,
-      mimeType: recording.mimeType || 'audio/mpeg',
-      filename: recording.originalName || 'audio.mp3',
+      mimeType: recording.mimeType || 'audio/wav',
+      filename: recording.originalName || 'audio.wav',
       duration: recording.duration,
       recordingId: recording._id,
       note: 'This URL requires Authorization header for access'
@@ -1161,7 +1163,7 @@ const proxyAudioFile = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Set CORS headers for audio streaming
+    // Set enhanced CORS headers for audio streaming
     const origin = req.headers.origin;
     const allowedOrigins = [
       'http://localhost:3000',
@@ -1177,13 +1179,15 @@ const proxyAudioFile = asyncHandler(async (req, res) => {
     res.set({
       'Access-Control-Allow-Origin': corsOrigin,
       'Access-Control-Allow-Credentials': 'true',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range',
-      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
-      'Content-Type': recording.mimeType || 'audio/mpeg',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS, HEAD',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range, If-Range',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type, Content-Disposition, Last-Modified, ETag',
+      'Content-Type': recording.mimeType || 'audio/wav', // Default to WAV for better compatibility
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'private, max-age=3600',
-      'X-Content-Type-Options': 'nosniff'
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': 'inline', // Important for audio playback
+      'Vary': 'Origin, Range'
     });
 
     // Handle cloud storage by downloading and streaming through API
@@ -1256,6 +1260,29 @@ const proxyAudioFile = asyncHandler(async (req, res) => {
         res.end(data.Body);
       } else {
         // Stream entire file
+        // First get object metadata to set proper headers
+        const headParams = {
+          Bucket: bucketName,
+          Key: objectKey
+        };
+        
+        const metadata = await s3Client.headObject(headParams).promise();
+        const fileSize = metadata.ContentLength;
+        const lastModified = metadata.LastModified;
+        const etag = metadata.ETag;
+        
+        // Set additional headers based on metadata
+        res.set({
+          'Content-Length': fileSize.toString(),
+          'Last-Modified': lastModified.toUTCString(),
+          'ETag': etag
+        });
+        
+        // If this is a HEAD request, just return headers
+        if (req.method === 'HEAD') {
+          return res.end();
+        }
+        
         const getParams = {
           Bucket: bucketName,
           Key: objectKey
@@ -1263,10 +1290,11 @@ const proxyAudioFile = asyncHandler(async (req, res) => {
         
         const stream = s3Client.getObject(getParams).createReadStream();
         
-        // Get file size for Content-Length header
-        stream.on('httpHeaders', (statusCode, headers) => {
-          if (headers['content-length']) {
-            res.set('Content-Length', headers['content-length']);
+        // Handle stream errors
+        stream.on('error', (streamError) => {
+          console.error('Stream error:', streamError);
+          if (!res.headersSent) {
+            return sendErrorResponse(res, 500, 'Stream error', 'STREAM_ERROR');
           }
         });
         

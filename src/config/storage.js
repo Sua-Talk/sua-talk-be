@@ -293,12 +293,22 @@ const deleteFile = async (key) => {
 
 const getFileUrl = (key, expiresIn = 3600) => {
   try {
-    // For Minio with CapRover internal networking, generate signed URL
-    const url = s3.getSignedUrl('getObject', {
+    // For Minio with CapRover internal networking, generate signed URL with proper headers
+    const params = {
       Bucket: BUCKET_NAME,
       Key: key,
       Expires: expiresIn
-    });
+    };
+    
+    // Add response headers for audio files to ensure proper Content-Type and CORS
+    if (key.includes('audio-recordings/')) {
+      params.ResponseContentType = 'audio/wav'; // Set proper content type
+      params.ResponseCacheControl = 'private, max-age=3600';
+      // Add CORS support via response headers
+      params.ResponseContentDisposition = 'inline'; // Important for audio streaming
+    }
+    
+    const url = s3.getSignedUrl('getObject', params);
     
     // Replace internal hostname with public endpoint if configured
     const publicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT;
