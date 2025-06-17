@@ -95,7 +95,7 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
 
   try {
     // Verify baby exists and belongs to user
-    const baby = await Baby.findOne({ _id: babyId, userId, isActive: true });
+    const baby = await Baby.findOne({ _id: babyId, parentId: userId, isActive: true });
     if (!baby) {
       return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND');
     }
@@ -113,11 +113,34 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
         console.log(`✅ Auto-detected duration: ${autoDuration} seconds`);
       } else if (extractedMetadata && !extractedMetadata.isValid) {
         console.warn('⚠️ Metadata extraction failed, using fallback mode');
+        
+        // Check if it's an FFprobe issue
+        if (extractedMetadata.extractionError === 'FFPROBE_NOT_FOUND') {
+          console.log('💡 FFprobe not found - upload will continue without auto-detected metadata');
+          console.log('   You can still provide duration manually via the "duration" field');
+          console.log('   To enable auto-detection, install FFmpeg: https://ffmpeg.org/download.html');
+        }
+        
         // Continue with upload but without duration validation
       }
     } catch (metadataError) {
-      console.warn('⚠️ Metadata extraction error:', metadataError.message);
+      console.warn('⚠️ Metadata extraction error:', {
+        error: metadataError.message,
+        type: metadataError.constructor.name
+      });
+      
+      // Create fallback metadata to prevent crashes
+      extractedMetadata = {
+        isValid: false,
+        extractionError: 'EXTRACTION_FAILED',
+        notice: `Metadata extraction failed: ${metadataError.message}`,
+        extractionMethod: 'error-fallback',
+        codec: 'unknown',
+        format: 'unknown'
+      };
+      
       // Continue with upload - metadata extraction is not critical for basic functionality
+      console.log('📤 Continuing upload without metadata extraction - this is normal if FFmpeg is not installed');
     }
 
     // Use auto-detected duration or manual input (prefer auto-detected)
@@ -226,33 +249,91 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     // Add recording context if provided
     if (recordingContext) {
       try {
-        const context = typeof recordingContext === 'string' 
-          ? JSON.parse(recordingContext) 
-          : recordingContext;
+        console.log('📝 Raw recordingContext received:', {
+          type: typeof recordingContext,
+          value: recordingContext,
+          length: recordingContext?.length
+        });
+
+        let context;
         
+        // Handle different data formats
+        if (typeof recordingContext === 'string') {
+          // Clean up HTML entities that might be present
+          let cleanContext = recordingContext
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .trim();
+          
+          console.log('📝 Cleaned recordingContext:', cleanContext);
+          
+          // Skip parsing if empty or just whitespace
+          if (!cleanContext || cleanContext.length === 0) {
+            console.log('⚠️ Empty recordingContext, skipping');
+            context = {};
+          } else {
+            // Try to parse JSON
+            try {
+              context = JSON.parse(cleanContext);
+            } catch (jsonError) {
+              console.warn('⚠️ Failed to parse recordingContext as JSON:', {
+                error: jsonError.message,
+                rawData: cleanContext.substring(0, 200) // First 200 chars for debugging
+              });
+              // Try to extract individual fields if it's not proper JSON
+              context = {};
+            }
+          }
+        } else if (typeof recordingContext === 'object' && recordingContext !== null) {
+          context = recordingContext;
+        } else {
+          console.warn('⚠️ Invalid recordingContext type:', typeof recordingContext);
+          context = {};
+        }
+        
+        // Initialize recording context
         audioData.recordingContext = {};
         
-        if (context.timeOfDay && ['morning', 'afternoon', 'evening', 'night'].includes(context.timeOfDay)) {
-          audioData.recordingContext.timeOfDay = context.timeOfDay;
+        // Validate and set fields with proper type checking
+        if (context && typeof context === 'object') {
+          if (context.timeOfDay && typeof context.timeOfDay === 'string' && 
+              ['morning', 'afternoon', 'evening', 'night'].includes(context.timeOfDay)) {
+            audioData.recordingContext.timeOfDay = context.timeOfDay;
+          }
+          
+          if (context.beforeFeeding !== undefined) {
+            audioData.recordingContext.beforeFeeding = Boolean(context.beforeFeeding);
+          }
+          
+          if (context.afterFeeding !== undefined) {
+            audioData.recordingContext.afterFeeding = Boolean(context.afterFeeding);
+          }
+          
+          if (context.beforeSleep !== undefined) {
+            audioData.recordingContext.beforeSleep = Boolean(context.beforeSleep);
+          }
+          
+          if (context.afterSleep !== undefined) {
+            audioData.recordingContext.afterSleep = Boolean(context.afterSleep);
+          }
+          
+          if (context.notes && typeof context.notes === 'string') {
+            audioData.recordingContext.notes = context.notes.substring(0, 500);
+          }
         }
-        if (context.beforeFeeding !== undefined) {
-          audioData.recordingContext.beforeFeeding = Boolean(context.beforeFeeding);
-        }
-        if (context.afterFeeding !== undefined) {
-          audioData.recordingContext.afterFeeding = Boolean(context.afterFeeding);
-        }
-        if (context.beforeSleep !== undefined) {
-          audioData.recordingContext.beforeSleep = Boolean(context.beforeSleep);
-        }
-        if (context.afterSleep !== undefined) {
-          audioData.recordingContext.afterSleep = Boolean(context.afterSleep);
-        }
-        if (context.notes && typeof context.notes === 'string') {
-          audioData.recordingContext.notes = context.notes.substring(0, 500);
-        }
+        
+        console.log('✅ Successfully processed recordingContext:', audioData.recordingContext);
+        
       } catch (parseError) {
-        console.error('Error parsing recording context:', parseError);
-        // Continue without recording context rather than failing
+        console.error('❌ Error parsing recording context:', {
+          error: parseError.message,
+          stack: parseError.stack?.split('\n').slice(0, 3),
+          rawData: recordingContext?.toString().substring(0, 200)
+        });
+        // Initialize empty context to continue
+        audioData.recordingContext = {};
       }
     }
 
