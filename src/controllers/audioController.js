@@ -95,8 +95,32 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
 
   try {
     // Verify baby exists and belongs to user
+    console.log('🔍 Looking for baby:', {
+      babyId,
+      userId: userId.toString(),
+      userIdType: typeof userId
+    });
+    
     const baby = await Baby.findOne({ _id: babyId, parentId: userId, isActive: true });
+    
+    console.log('👶 Baby search result:', {
+      found: !!baby,
+      babyData: baby ? {
+        id: baby._id.toString(),
+        name: baby.name,
+        parentId: baby.parentId.toString()
+      } : null
+    });
+    
     if (!baby) {
+      // Additional debugging - check if baby exists but with different parent
+      const anyBaby = await Baby.findOne({ _id: babyId });
+      console.log('🔍 Debug - Any baby with this ID:', {
+        exists: !!anyBaby,
+        parentId: anyBaby ? anyBaby.parentId.toString() : null,
+        isActive: anyBaby ? anyBaby.isActive : null
+      });
+      
       return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND');
     }
 

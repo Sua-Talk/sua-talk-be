@@ -1,7 +1,21 @@
 const ffprobe = require('node-ffprobe');
-const { parseFile } = require('music-metadata');
 const path = require('path');
 const fs = require('fs');
+
+// Try to require music-metadata with fallback
+let parseFile = null;
+let musicMetadataAvailable = false;
+
+try {
+  const { parseFile: parseFileFunc } = require('music-metadata');
+  parseFile = parseFileFunc;
+  musicMetadataAvailable = true;
+  console.log('✅ Music-metadata loaded successfully');
+} catch (error) {
+  console.warn('⚠️ Music-metadata not available:', error.message);
+  console.log('📝 Will use FFprobe fallback only');
+  musicMetadataAvailable = false;
+}
 
 /**
  * Service for extracting audio metadata automatically
@@ -30,16 +44,20 @@ class AudioMetadataService {
         
         console.log('📂 Processing file from path:', audioFilePath);
         
-        // Try music-metadata FIRST (more reliable for deployment)
-        try {
-          console.log('🎵 Trying music-metadata as primary method...');
-          const musicMetadata = await this.extractMetadataWithMusicMetadata(audioFilePath, originalName);
-          if (musicMetadata && musicMetadata.isValid) {
-            console.log('✅ Successfully extracted metadata using music-metadata (primary)');
-            return musicMetadata;
+        // Try music-metadata FIRST (if available)
+        if (musicMetadataAvailable && parseFile) {
+          try {
+            console.log('🎵 Trying music-metadata as primary method...');
+            const musicMetadata = await this.extractMetadataWithMusicMetadata(audioFilePath, originalName);
+            if (musicMetadata && musicMetadata.isValid) {
+              console.log('✅ Successfully extracted metadata using music-metadata (primary)');
+              return musicMetadata;
+            }
+          } catch (musicError) {
+            console.warn('⚠️ Music-metadata failed, trying FFprobe as fallback:', musicError.message);
           }
-        } catch (musicError) {
-          console.warn('⚠️ Music-metadata failed, trying FFprobe as fallback:', musicError.message);
+        } else {
+          console.log('📝 Music-metadata not available, using FFprobe directly');
         }
         
         // FFprobe as fallback (only if music-metadata fails)
@@ -416,6 +434,11 @@ class AudioMetadataService {
       let tempFilePath = null;
       
       console.log('🎵 Using music-metadata for:', originalName || audioFilePath);
+      
+      // Check if parseFile is available
+      if (!parseFile) {
+        throw new Error('Music-metadata parseFile function not available');
+      }
       
       // Handle different input types
       if (typeof audioFilePath === 'string') {

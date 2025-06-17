@@ -53,7 +53,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
     "multer-s3": "^2.9.0",
-    "music-metadata": "^11.3.0",
+    "music-metadata": "7.14.0",
     "node-ffprobe": "^3.0.0",
     "nodemailer": "^7.0.3",
     "passport": "^0.7.0",
