@@ -299,6 +299,17 @@ const getFileUrl = (key, expiresIn = 3600) => {
       Key: key,
       Expires: expiresIn
     });
+    
+    // Replace internal hostname with public endpoint if configured
+    const publicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT;
+    if (publicEndpoint && url.includes('srv-captain--minio:9000')) {
+      // Replace internal hostname with public endpoint
+      const modifiedUrl = url.replace('http://srv-captain--minio:9000', publicEndpoint);
+      console.log(`🔄 Replaced internal URL with public endpoint: ${modifiedUrl}`);
+      return modifiedUrl;
+    }
+    
+    // If no public endpoint configured, return as-is (for development)
     return url;
   } catch (error) {
     console.error(`❌ Error generating file URL for ${key}:`, error);

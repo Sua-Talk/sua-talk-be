@@ -1102,6 +1102,184 @@ const getStreamUrl = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Proxy audio file from internal storage (alternative to exposing Minio)
+ * @route GET /api/audio/proxy/:id
+ * @access Private
+ */
+const proxyAudioFile = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const recordingId = req.params.id;
+
+  // Check if account is active
+  if (!req.user.isActive) {
+    return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
+  }
+
+  // Find recording and verify ownership
+  const recording = await AudioRecording.findOne({ 
+    _id: recordingId, 
+    userId, 
+    isActive: true 
+  });
+
+  if (!recording) {
+    return sendErrorResponse(res, 404, 'Audio recording not found', 'RECORDING_NOT_FOUND');
+  }
+
+  try {
+    // Set CORS headers for audio streaming
+    const origin = req.headers.origin;
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001', 
+      'http://localhost:5173',
+      'https://suatalk.site',
+      'https://www.suatalk.site',
+      'https://api.suatalk.site'
+    ];
+    
+    const corsOrigin = allowedOrigins.includes(origin) ? origin : '*';
+    
+    res.set({
+      'Access-Control-Allow-Origin': corsOrigin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
+      'Content-Type': recording.mimeType || 'audio/mpeg',
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
+    // Handle cloud storage by downloading and streaming through API
+    if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
+      const AWS = require('aws-sdk');
+      
+      // Configure S3 client for internal Minio access
+      const s3Client = new AWS.S3({
+        endpoint: process.env.MINIO_ENDPOINT || 'http://srv-captain--minio:9000',
+        accessKeyId: process.env.MINIO_ACCESS_KEY,
+        secretAccessKey: process.env.MINIO_SECRET_KEY,
+        s3ForcePathStyle: true,
+        signatureVersion: 'v4',
+        region: process.env.MINIO_REGION || 'us-east-1'
+      });
+
+      // Extract object key from file path
+      const bucketName = process.env.MINIO_BUCKET_NAME || 'suatalk-files';
+      let objectKey = recording.filePath;
+      
+      if (recording.filePath.startsWith('http')) {
+        const url = new URL(recording.filePath);
+        objectKey = url.pathname.substring(1); // Remove leading slash
+      }
+
+      console.log(`🔄 Proxying audio file from Minio: ${objectKey}`);
+
+      // Handle range requests for audio seeking
+      const range = req.headers.range;
+      
+      if (range) {
+        // Get object metadata first to determine size
+        const headParams = {
+          Bucket: bucketName,
+          Key: objectKey
+        };
+        
+        const metadata = await s3Client.headObject(headParams).promise();
+        const fileSize = metadata.ContentLength;
+        
+        // Parse range header
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+
+        // Get partial object
+        const getParams = {
+          Bucket: bucketName,
+          Key: objectKey,
+          Range: `bytes=${start}-${end}`
+        };
+        
+        const data = await s3Client.getObject(getParams).promise();
+        
+        res.status(206);
+        res.set({
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Content-Length': chunksize.toString()
+        });
+        
+        res.end(data.Body);
+      } else {
+        // Stream entire file
+        const getParams = {
+          Bucket: bucketName,
+          Key: objectKey
+        };
+        
+        const stream = s3Client.getObject(getParams).createReadStream();
+        
+        // Get file size for Content-Length header
+        stream.on('httpHeaders', (statusCode, headers) => {
+          if (headers['content-length']) {
+            res.set('Content-Length', headers['content-length']);
+          }
+        });
+        
+        stream.pipe(res);
+      }
+      
+      return;
+    }
+
+    // For local file storage (development)
+    const path = require('path');
+    const fs = require('fs');
+    
+    const fullFilePath = path.resolve(recording.filePath);
+    
+    if (!fs.existsSync(fullFilePath)) {
+      return sendErrorResponse(res, 404, 'Audio file not found on disk', 'FILE_NOT_FOUND');
+    }
+
+    const stat = fs.statSync(fullFilePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      // Handle range requests (for seeking in audio)
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = (end - start) + 1;
+
+      res.status(206);
+      res.set({
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Content-Length': chunksize.toString()
+      });
+
+      const stream = fs.createReadStream(fullFilePath, { start, end });
+      stream.pipe(res);
+    } else {
+      // Stream entire file
+      res.set({
+        'Content-Length': fileSize.toString()
+      });
+
+      const stream = fs.createReadStream(fullFilePath);
+      stream.pipe(res);
+    }
+
+  } catch (error) {
+    console.error('Error proxying audio file:', error);
+    return sendErrorResponse(res, 500, 'Failed to stream audio file', 'PROXY_ERROR');
+  }
+});
+
 module.exports = {
   uploadAudioRecording,
   getAllRecordings,
@@ -1111,5 +1289,6 @@ module.exports = {
   deleteRecording,
   cleanupAudioFiles,
   streamAudio,
-  getStreamUrl
+  getStreamUrl,
+  proxyAudioFile
 }; 

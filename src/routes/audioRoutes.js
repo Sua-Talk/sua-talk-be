@@ -242,4 +242,48 @@ router.get('/stream-url/:id',
   audioController.getStreamUrl
 );
 
+/**
+ * @route OPTIONS /api/audio/proxy/:id
+ * @desc Handle preflight CORS requests for audio proxy
+ * @access Public
+ */
+router.options('/proxy/:id', (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:5173',
+    'https://suatalk.site',
+    'https://www.suatalk.site',
+    'https://api.suatalk.site'
+  ];
+  
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : '*';
+  
+  res.set({
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges, Content-Type',
+    'Access-Control-Max-Age': '86400'
+  });
+  
+  res.status(204).end();
+});
+
+/**
+ * @route GET /api/audio/proxy/:id
+ * @desc Proxy audio file through API (alternative to exposing Minio)
+ * @access Private
+ */
+router.get('/proxy/:id', 
+  profileRateLimit, 
+  authenticate, 
+  validateObjectId('id'),
+  handleValidationErrors,
+  securityLogger, 
+  audioController.proxyAudioFile
+);
+
 module.exports = router; 
