@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-13T07:50:41.732Z*
+    *Last bundled: 2025-06-17T02:04:37.535Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -270,9 +270,7 @@ paths:
       tags:
         - Audio
       summary: Delete audio recording
-      description: |
-        Permanently delete an audio recording and its associated analysis data.
-        This action cannot be undone.
+      description: Delete an audio recording and its associated file.
       security:
         - bearerAuth: []
       parameters:
@@ -297,10 +295,137 @@ paths:
                   message:
                     type: string
                     example: Audio recording deleted successfully
+                  data:
+                    type: object
+                    properties:
+                      deletedRecording:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: 507f1f77bcf86cd799439011
+                          filename:
+                            type: string
+                            example: audio-recording.wav
+                          deletedAt:
+                            type: string
+                            format: date-time
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /audio/stream/{id}:
+    get:
+      tags:
+        - Audio
+      summary: Stream audio recording
+      description: |
+        Stream an audio recording file with proper CORS support for web players.
+        This endpoint handles range requests for audio seeking and provides 
+        appropriate headers for cross-origin audio playback.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Audio recording ID
+          required: true
+          schema:
+            type: string
+            example: 507f1f77bcf86cd799439011
+        - name: Range
+          in: header
+          description: HTTP Range header for partial content requests
+          required: false
+          schema:
+            type: string
+            example: bytes=0-1023
+      responses:
+        '200':
+          description: Audio file streamed successfully
+          headers:
+            Content-Type:
+              description: Audio MIME type
+              schema:
+                type: string
+                example: audio/mpeg
+            Content-Length:
+              description: File size in bytes
+              schema:
+                type: integer
+                example: 1048576
+            Accept-Ranges:
+              description: Indicates range request support
+              schema:
+                type: string
+                example: bytes
+            Cache-Control:
+              description: Cache control headers
+              schema:
+                type: string
+                example: private, max-age=3600
+            Access-Control-Allow-Origin:
+              description: CORS allowed origins
+              schema:
+                type: string
+                example: '*'
+            Access-Control-Allow-Credentials:
+              description: CORS credentials support
+              schema:
+                type: string
+                example: 'true'
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            audio/ogg:
+              schema:
+                type: string
+                format: binary
+            audio/webm:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Partial content (range request)
+          headers:
+            Content-Range:
+              description: Range of bytes being served
+              schema:
+                type: string
+                example: bytes 0-1023/2048576
+            Content-Length:
+              description: Size of the partial content
+              schema:
+                type: integer
+                example: 1024
+            Content-Type:
+              description: Audio MIME type
+              schema:
+                type: string
+                example: audio/mpeg
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '302':
+          description: Redirect to signed URL (for cloud storage)
+          headers:
+            Location:
+              description: Signed URL for direct access
+              schema:
+                type: string
+                example: https://storage.example.com/audio-file.wav?signature=...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
@@ -2551,10 +2676,14 @@ components:
           type: string
           example: 507f1f77bcf86cd799439009
           description: ID of the user who uploaded the recording
-        fileName:
+        filename:
           type: string
           example: recording_20240115_183000.wav
-          description: Original filename
+          description: Generated filename for storage
+        originalName:
+          type: string
+          example: baby_cry_evening.wav
+          description: Original filename from upload
         fileUrl:
           type: string
           example: https://api.suatalk.site/uploads/audio/recording123.wav

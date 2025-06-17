@@ -20,6 +20,8 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
   console.log('req.file:', req.file);
   console.log('req.body:', req.body);
   console.log('req.headers:', req.headers);
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Content-Length:', req.headers['content-length']);
   console.log('========================');
 
   // Check if account is active
@@ -27,9 +29,21 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
   }
 
+  // Validate required fields first
+  if (!babyId) {
+    return sendErrorResponse(res, 400, 'Baby ID is required', 'BABY_ID_REQUIRED', {
+      hint: 'Make sure to include babyId in your form data',
+      requiredFields: ['audio (file)', 'babyId']
+    });
+  }
+
   // Check if file was uploaded
   if (!req.file) {
-    return sendErrorResponse(res, 400, 'No audio file provided', 'NO_FILE_PROVIDED');
+    return sendErrorResponse(res, 400, 'No audio file provided', 'NO_FILE_PROVIDED', {
+      hint: 'Make sure to include an audio file with field name "audio"',
+      requiredFields: ['audio (file)', 'babyId'],
+      supportedFormats: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg']
+    });
   }
 
   // Validate that file has required properties
@@ -50,7 +64,9 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     } catch (cleanupError) {
       console.error('Error cleaning up file:', cleanupError);
     }
-    return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND');
+    return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND', {
+      hint: 'Make sure the babyId belongs to your account and the baby is active'
+    });
   }
 
   try {
@@ -687,6 +703,99 @@ const cleanupAudioFiles = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * Stream audio file with proper CORS headers
+ * @route GET /api/audio/stream/:id
+ * @access Private
+ */
+const streamAudio = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const recordingId = req.params.id;
+
+  // Check if account is active
+  if (!req.user.isActive) {
+    return sendErrorResponse(res, 403, 'Account is deactivated', 'ACCOUNT_DEACTIVATED');
+  }
+
+  // Find recording and verify ownership
+  const recording = await AudioRecording.findOne({ 
+    _id: recordingId, 
+    userId, 
+    isActive: true 
+  });
+
+  if (!recording) {
+    return sendErrorResponse(res, 404, 'Audio recording not found', 'RECORDING_NOT_FOUND');
+  }
+
+  try {
+    // Set CORS headers for audio streaming
+    res.set({
+      'Access-Control-Allow-Origin': req.headers.origin || '*',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept, Authorization',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+      'Content-Type': recording.mimeType || 'audio/mpeg',
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff'
+    });
+
+    // Handle cloud storage URLs
+    if (process.env.NODE_ENV === 'production' && recording.filePath.startsWith('http')) {
+      // For cloud storage, redirect to the signed URL
+      const fileStorageService = require('../services/fileStorage');
+      const signedUrl = await fileStorageService.getSignedUrl(recording.filePath);
+      
+      if (signedUrl) {
+        return res.redirect(302, signedUrl);
+      } else {
+        return sendErrorResponse(res, 500, 'Failed to generate signed URL', 'SIGNED_URL_ERROR');
+      }
+    }
+
+    // For local file storage
+    const fullFilePath = path.resolve(recording.filePath);
+    
+    if (!fs.existsSync(fullFilePath)) {
+      return sendErrorResponse(res, 404, 'Audio file not found on disk', 'FILE_NOT_FOUND');
+    }
+
+    const stat = fs.statSync(fullFilePath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      // Handle range requests (for seeking in audio)
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = (end - start) + 1;
+
+      res.status(206);
+      res.set({
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Content-Length': chunksize.toString()
+      });
+
+      const stream = fs.createReadStream(fullFilePath, { start, end });
+      stream.pipe(res);
+    } else {
+      // Stream entire file
+      res.set({
+        'Content-Length': fileSize.toString()
+      });
+
+      const stream = fs.createReadStream(fullFilePath);
+      stream.pipe(res);
+    }
+
+  } catch (error) {
+    console.error('Error streaming audio file:', error);
+    return sendErrorResponse(res, 500, 'Failed to stream audio file', 'STREAM_ERROR');
+  }
+});
+
 module.exports = {
   uploadAudioRecording,
   getAllRecordings,
@@ -694,5 +803,6 @@ module.exports = {
   getPendingAnalysisRecordings,
   batchTriggerAnalysis,
   deleteRecording,
-  cleanupAudioFiles
+  cleanupAudioFiles,
+  streamAudio
 }; 

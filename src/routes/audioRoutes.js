@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const audioController = require('../controllers/audioController');
 const { authenticate } = require('../middleware/auth');
-const { validateObjectId, validateAudioRecordingsQuery } = require('../middleware/validation');
+const { validateObjectId, validateAudioRecordingsQuery, validateAudioUpload } = require('../middleware/validation');
 const { handleValidationErrors } = require('../middleware/errorHandler');
 const { body } = require('express-validator');
 const { 
@@ -28,6 +28,8 @@ router.post('/upload',
   authenticate, 
   uploadAudioRecording,
   handleUploadError,
+  validateAudioUpload,
+  handleValidationErrors,
   sanitizeInput, 
   securityLogger, 
   audioController.uploadAudioRecording
@@ -133,6 +135,20 @@ router.post('/cleanup',
   authenticate, 
   securityLogger, 
   audioController.cleanupAudioFiles
+);
+
+/**
+ * @route GET /api/audio/stream/:id
+ * @desc Stream audio file with CORS support
+ * @access Private
+ */
+router.get('/stream/:id', 
+  profileRateLimit, 
+  authenticate, 
+  validateObjectId('id'),
+  handleValidationErrors,
+  securityLogger, 
+  audioController.streamAudio
 );
 
 module.exports = router; 

@@ -434,6 +434,34 @@ const validateOAuthQuery = [
     .withMessage('Redirect URL cannot exceed 500 characters')
 ];
 
+// Audio upload validation
+const validateAudioUpload = [
+  body('babyId')
+    .notEmpty()
+    .withMessage('Baby ID is required')
+    .isMongoId()
+    .withMessage('Baby ID must be a valid MongoDB ObjectId'),
+  
+  body('duration')
+    .optional()
+    .isFloat({ min: 0.1, max: 300 })
+    .withMessage('Duration must be between 0.1 and 300 seconds (5 minutes)'),
+  
+  body('recordingContext')
+    .optional()
+    .custom((value) => {
+      if (typeof value === 'string') {
+        try {
+          JSON.parse(value);
+          return true;
+        } catch (error) {
+          throw new Error('Recording context must be valid JSON string');
+        }
+      }
+      return true;
+    })
+];
+
 module.exports = {
   validateRegistration,
   validateEmailVerification,
@@ -451,5 +479,6 @@ module.exports = {
   validateAudioRecordingsQuery,
   validateOAuthQuery,
   validateEmailCheck,
-  validateOTPAndRegistration
+  validateOTPAndRegistration,
+  validateAudioUpload
 }; 

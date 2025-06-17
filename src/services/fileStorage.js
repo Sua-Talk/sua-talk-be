@@ -459,6 +459,37 @@ class FileStorageService {
   }
 
   /**
+   * Generate signed URL for cloud storage access
+   * @param {string} filePathOrKey - File path or object key
+   * @param {number} expiresIn - Expiration time in seconds (default: 1 hour)
+   * @returns {string|null} - Signed URL or null if failed
+   */
+  async getSignedUrl(filePathOrKey, expiresIn = 3600) {
+    try {
+      // Check if we're in production with cloud storage
+      if (process.env.NODE_ENV === 'production' && process.env.MINIO_ENDPOINT) {
+        // Use cloud storage signed URL
+        const { getFileUrl } = require('../config/storage');
+        
+        // Extract object key from URL if it's a full URL
+        let objectKey = filePathOrKey;
+        if (filePathOrKey.startsWith('http')) {
+          const url = new URL(filePathOrKey);
+          objectKey = url.pathname.substring(1); // Remove leading slash
+        }
+        
+        return getFileUrl(objectKey, expiresIn);
+      } else {
+        // For local storage, return the file path as is (will be handled by streaming)
+        return null;
+      }
+    } catch (error) {
+      console.error('Error generating signed URL:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get storage statistics
    * @returns {Object} - Storage stats
    */

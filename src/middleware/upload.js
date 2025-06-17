@@ -176,6 +176,7 @@ const createUploadMiddleware = (cloudUploadFn, localUploadFn, type) => {
     // Add timeout handling for upload
     const timeout = setTimeout(() => {
       if (!res.headersSent) {
+        console.error(`❌ Upload timeout for ${type} - Request: ${req.method} ${req.url}`);
         return res.status(408).json({
           success: false,
           message: 'Upload timeout. Please try again.',
@@ -189,16 +190,38 @@ const createUploadMiddleware = (cloudUploadFn, localUploadFn, type) => {
       if (error) {
         // Handle specific busboy errors
         if (error.message && error.message.includes('Unexpected end of form')) {
+          console.error(`❌ Form incomplete error for ${type}:`, {
+            error: error.message,
+            headers: req.headers,
+            contentLength: req.headers['content-length'],
+            contentType: req.headers['content-type']
+          });
           return res.status(400).json({
             success: false,
-            message: 'Upload was interrupted. Please try again.',
-            error: 'FORM_INCOMPLETE'
+            message: 'Upload was interrupted or form data is incomplete. Please check your request format and try again.',
+            error: 'FORM_INCOMPLETE',
+            details: {
+              hint: 'Make sure you are sending multipart/form-data with the correct field names',
+              requiredFields: type === 'audio recording' ? ['audio (file)', 'babyId'] : ['photo (file)']
+            }
           });
         }
+        
+        // Log other errors for debugging
+        console.error(`❌ Upload error for ${type}:`, {
+          error: error.message,
+          code: error.code,
+          stack: error.stack,
+          headers: req.headers
+        });
+        
         return next(error);
       }
       next();
     };
+
+    // Log upload attempt
+    console.log(`📤 Attempting ${type} upload - Content-Type: ${req.headers['content-type']}, Content-Length: ${req.headers['content-length']}`);
 
     // Try cloud storage first, fall back to local on error
     if (!useLocalStorage && storageConfig) {
@@ -246,12 +269,30 @@ const uploadAvatar = createUploadMiddleware(
 
 // Error handling middleware for multer
 const handleUploadError = (error, req, res, next) => {
+  console.error('🚨 Upload error occurred:', {
+    error: error.message,
+    code: error.code,
+    route: req.route?.path,
+    method: req.method,
+    headers: req.headers,
+    body: req.body,
+    file: req.file
+  });
+
   // Handle busboy errors specifically
   if (error.message && error.message.includes('Unexpected end of form')) {
     return res.status(400).json({
       success: false,
-      message: 'Upload was interrupted or form data is incomplete. Please try again.',
-      error: 'FORM_INCOMPLETE'
+      message: 'Upload was interrupted or form data is incomplete. Please check your request format and try again.',
+      error: 'FORM_INCOMPLETE',
+      details: {
+        hint: 'Make sure you are sending multipart/form-data with the correct field names',
+        requiredFields: req.route?.path?.includes('audio') ? ['audio (file)', 'babyId'] : ['photo (file)'],
+        receivedHeaders: {
+          'content-type': req.headers['content-type'],
+          'content-length': req.headers['content-length']
+        }
+      }
     });
   }
 
@@ -262,7 +303,11 @@ const handleUploadError = (error, req, res, next) => {
       return res.status(400).json({
         success: false,
         message: `File too large. Maximum size is ${maxSize}.`,
-        error: 'FILE_TOO_LARGE'
+        error: 'FILE_TOO_LARGE',
+        details: {
+          maxSize: maxSize,
+          receivedSize: req.file?.size ? `${(req.file.size / (1024 * 1024)).toFixed(2)}MB` : 'unknown'
+        }
       });
     }
     
@@ -279,8 +324,12 @@ const handleUploadError = (error, req, res, next) => {
       const expectedField = isAudioUpload ? 'audio' : 'photo';
       return res.status(400).json({
         success: false,
-        message: `Unexpected field name. Use "${expectedField}" as the field name.`,
-        error: 'UNEXPECTED_FIELD'
+        message: `Unexpected field name. Use "${expectedField}" as the field name for the file.`,
+        error: 'UNEXPECTED_FIELD',
+        details: {
+          expectedField: expectedField,
+          hint: `Make sure your form field name is exactly "${expectedField}"`
+        }
       });
     }
 
@@ -288,7 +337,10 @@ const handleUploadError = (error, req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Too many form fields.',
-        error: 'TOO_MANY_FIELDS'
+        error: 'TOO_MANY_FIELDS',
+        details: {
+          hint: 'Reduce the number of form fields in your request'
+        }
       });
     }
 
@@ -296,7 +348,10 @@ const handleUploadError = (error, req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Field name too long.',
-        error: 'FIELD_NAME_TOO_LONG'
+        error: 'FIELD_NAME_TOO_LONG',
+        details: {
+          maxLength: '100 characters'
+        }
       });
     }
 
@@ -304,7 +359,10 @@ const handleUploadError = (error, req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Field value too long.',
-        error: 'FIELD_VALUE_TOO_LONG'
+        error: 'FIELD_VALUE_TOO_LONG',
+        details: {
+          maxLength: req.route?.path?.includes('audio') ? '1MB' : '50KB'
+        }
       });
     }
 
@@ -312,7 +370,10 @@ const handleUploadError = (error, req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Too many fields.',
-        error: 'TOO_MANY_FIELDS'
+        error: 'TOO_MANY_FIELDS',
+        details: {
+          maxFields: req.route?.path?.includes('audio') ? 10 : 5
+        }
       });
     }
   }
@@ -321,10 +382,19 @@ const handleUploadError = (error, req, res, next) => {
       error.message.includes('Only image files') ||
       error.message.includes('Only audio files') ||
       error.message.includes('Invalid audio file type')) {
+    const isAudioUpload = req.route?.path?.includes('audio');
+    const allowedTypes = isAudioUpload 
+      ? ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg']
+      : ['image/jpeg', 'image/png', 'image/webp'];
+    
     return res.status(400).json({
       success: false,
       message: error.message,
-      error: 'INVALID_FILE_TYPE'
+      error: 'INVALID_FILE_TYPE',
+      details: {
+        allowedTypes: allowedTypes,
+        receivedType: req.file?.mimetype || 'unknown'
+      }
     });
   }
 
@@ -333,12 +403,15 @@ const handleUploadError = (error, req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Upload connection was interrupted. Please try again.',
-      error: 'CONNECTION_INTERRUPTED'
+      error: 'CONNECTION_INTERRUPTED',
+      details: {
+        hint: 'Check your internet connection and try again'
+      }
     });
   }
   
   // Log unhandled errors for debugging
-  console.error('Unhandled upload error:', error);
+  console.error('❌ Unhandled upload error:', error);
   
   // Pass other errors to the next error handler
   next(error);
