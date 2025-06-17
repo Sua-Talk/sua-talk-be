@@ -22,7 +22,7 @@ info:
 
     ---
     *This documentation was automatically generated from modular OpenAPI files.*
-    *Last bundled: 2025-06-17T02:04:37.535Z*
+    *Last bundled: 2025-06-17T02:18:56.986Z*
   version: 1.0.0
   contact:
     name: SuaTalk API Support
@@ -55,10 +55,28 @@ paths:
     post:
       tags:
         - Audio
-      summary: Upload audio recording
+      summary: Upload audio recording with auto-metadata detection
       description: |
         Upload an audio recording for baby cry analysis. The audio file will be 
         processed for machine learning analysis automatically.
+
+        **🎵 NEW: AUTO-METADATA DETECTION!**
+        - Duration is now **automatically detected** from the audio file
+        - Sample rate, channels, and bitrate are auto-extracted
+        - No more manual duration input needed!
+
+        **ONLY 2 FIELDS REQUIRED:**
+        - `audio`: Audio file (field name must be exactly "audio")
+        - `babyId`: ID of the baby this recording belongs to
+
+        **All other fields are completely optional!** 
+
+        **Technical Requirements:**
+        - Request must use `multipart/form-data` content type
+        - Audio file field name must be exactly "audio" 
+        - Maximum file size: 50MB
+        - Maximum duration: 5 minutes (300 seconds) - **auto-validated**
+        - Supported formats: WAV, MP3, M4A, WebM, OGG, FLAC
       security:
         - bearerAuth: []
       requestBody:
@@ -74,32 +92,42 @@ paths:
                 audio:
                   type: string
                   format: binary
-                  description: Audio file (WAV, MP3, M4A, max 50MB, max 5 minutes)
+                  description: '**REQUIRED** - Audio file with field name ''audio'' (Duration will be auto-detected)'
                 babyId:
                   type: string
                   example: 507f1f77bcf86cd799439011
-                  description: ID of the baby this recording belongs to
+                  description: '**REQUIRED** - ID of the baby this recording belongs to'
+                recordingContext:
+                  type: string
+                  example: '{"timeOfDay":"evening","beforeFeeding":true,"notes":"Baby seemed hungry"}'
+                  description: '**OPTIONAL** - JSON string with recording context information'
                 title:
                   type: string
                   maxLength: 100
                   example: Evening cry session
-                  description: Optional title for the recording
+                  description: '**OPTIONAL** - Title for the recording (legacy support)'
                 notes:
                   type: string
                   maxLength: 500
                   example: Baby was crying before bedtime, seemed tired
-                  description: Optional notes about the recording context
+                  description: '**OPTIONAL** - Notes about the recording context (legacy support)'
                 recordingDate:
                   type: string
                   format: date-time
                   example: '2024-01-15T18:30:00.000Z'
-                  description: When the recording was made (defaults to upload time)
+                  description: '**OPTIONAL** - When the recording was made (defaults to upload time)'
+                duration:
+                  type: number
+                  minimum: 0.1
+                  maximum: 300
+                  example: 45.5
+                  description: '**DEPRECATED** - Duration will be auto-detected from audio file. Manual input ignored.'
             encoding:
               audio:
-                contentType: audio/wav, audio/mpeg, audio/mp4
+                contentType: audio/wav, audio/mpeg, audio/mp4, audio/webm, audio/ogg, audio/flac
       responses:
         '201':
-          description: Audio uploaded successfully
+          description: Audio recording uploaded successfully with auto-detected metadata
           content:
             application/json:
               schema:
@@ -110,31 +138,130 @@ paths:
                     example: true
                   message:
                     type: string
-                    example: Audio recording uploaded successfully
+                    example: Audio recording uploaded successfully with auto-detected metadata and ML analysis queued
                   data:
-                    $ref: ../schemas/audio.yaml#/AudioRecording
+                    type: object
+                    properties:
+                      recording:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            example: 507f1f77bcf86cd799439011
+                          filename:
+                            type: string
+                            example: audio-1672678123456-abc123.wav
+                          originalName:
+                            type: string
+                            example: baby_cry_recording.wav
+                          fileSize:
+                            type: integer
+                            example: 2048576
+                            description: File size in bytes
+                          fileSizeFormatted:
+                            type: string
+                            example: 2.0 MB
+                          mimeType:
+                            type: string
+                            example: audio/wav
+                          duration:
+                            type: number
+                            example: 45.2
+                            description: '**AUTO-DETECTED** Duration in seconds'
+                          durationFormatted:
+                            type: string
+                            example: '0:45'
+                            description: '**AUTO-GENERATED** Human-readable duration'
+                          fileUrl:
+                            type: string
+                            example: https://api.suatalk.site/uploads/audio/audio-1672678123456-abc123.wav
+                          babyId:
+                            type: string
+                            example: 507f1f77bcf86cd799439010
+                          analysisStatus:
+                            type: string
+                            example: pending
+                            enum:
+                              - pending
+                              - processing
+                              - completed
+                              - failed
+                          audioMetadata:
+                            type: object
+                            description: '**AUTO-DETECTED** Audio technical metadata'
+                            properties:
+                              sampleRate:
+                                type: integer
+                                example: 44100
+                                description: Sample rate in Hz
+                              bitRate:
+                                type: integer
+                                example: 320000
+                                description: Bitrate in bps
+                              channels:
+                                type: integer
+                                example: 1
+                                description: Number of channels (1=mono, 2=stereo)
+                              encoding:
+                                type: string
+                                example: PCM
+                                description: Audio encoding format
+                          metadataAutoDetected:
+                            type: boolean
+                            example: true
+                            description: Whether metadata was successfully auto-detected
+                          recordingContext:
+                            type: object
+                            nullable: true
+                          uploadedAt:
+                            type: string
+                            format: date-time
+                            example: '2024-01-15T18:35:00.000Z'
+                          createdAt:
+                            type: string
+                            format: date-time
+                            example: '2024-01-15T18:35:00.000Z'
+                          analysis:
+                            type: object
+                            properties:
+                              queued:
+                                type: boolean
+                                example: true
+                                description: Whether ML analysis was automatically queued
+                              queuedAt:
+                                type: string
+                                format: date-time
+                                nullable: true
+                                example: '2024-01-15T18:35:30.000Z'
+                              status:
+                                type: string
+                                example: pending
         '400':
-          description: Invalid file format or size
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Baby not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Baby not found or access denied
+                  error:
+                    type: string
+                    example: BABY_NOT_FOUND
         '413':
-          description: File too large
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '415':
-          description: Unsupported audio format
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/PayloadTooLarge'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /audio/recordings:
     get:
       tags:

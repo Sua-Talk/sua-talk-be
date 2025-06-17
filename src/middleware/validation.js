@@ -434,7 +434,7 @@ const validateOAuthQuery = [
     .withMessage('Redirect URL cannot exceed 500 characters')
 ];
 
-// Audio upload validation
+// Audio upload validation - minimal required fields only
 const validateAudioUpload = [
   body('babyId')
     .notEmpty()
@@ -442,6 +442,7 @@ const validateAudioUpload = [
     .isMongoId()
     .withMessage('Baby ID must be a valid MongoDB ObjectId'),
   
+  // All other fields are optional
   body('duration')
     .optional()
     .isFloat({ min: 0.1, max: 300 })
@@ -459,7 +460,25 @@ const validateAudioUpload = [
         }
       }
       return true;
-    })
+    }),
+  
+  // Legacy fields for backward compatibility
+  body('title')
+    .optional()
+    .trim()
+    .isLength({ max: 100 })
+    .withMessage('Title cannot exceed 100 characters'),
+  
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Notes cannot exceed 500 characters'),
+  
+  body('recordingDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Recording date must be a valid ISO 8601 date')
 ];
 
 module.exports = {

@@ -5,15 +5,26 @@ const path = require('path');
 const { sendSuccessResponse, sendErrorResponse, asyncHandler } = require('../middleware/errorHandler');
 const { audioRecordingsDir } = require('../middleware/upload');
 const jobManager = require('../jobs/jobManager');
+const audioMetadataService = require('../services/audioMetadataService');
 
 /**
- * Upload audio recording for a baby
+ * Upload and process audio recording with auto-metadata detection
  * @route POST /api/audio/upload
  * @access Private
  */
 const uploadAudioRecording = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { babyId, duration, recordingContext } = req.body;
+  
+  // Extract all possible fields from request body - all except babyId are optional
+  const { 
+    babyId, 
+    duration, // This will be overridden by auto-detected duration
+    recordingContext,
+    // Legacy fields for backward compatibility
+    title,
+    notes,
+    recordingDate
+  } = req.body;
 
   // Debug logging for troubleshooting
   console.log('=== Audio Upload Debug ===');
@@ -31,45 +42,78 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
 
   // Validate required fields first
   if (!babyId) {
-    return sendErrorResponse(res, 400, 'Baby ID is required', 'BABY_ID_REQUIRED', {
-      hint: 'Make sure to include babyId in your form data',
-      requiredFields: ['audio (file)', 'babyId']
-    });
-  }
-
-  // Check if file was uploaded
-  if (!req.file) {
-    return sendErrorResponse(res, 400, 'No audio file provided', 'NO_FILE_PROVIDED', {
-      hint: 'Make sure to include an audio file with field name "audio"',
+    return sendErrorResponse(res, 400, 'Baby ID is required', 'MISSING_BABY_ID', {
+      hint: 'Provide the babyId field in your multipart/form-data request',
       requiredFields: ['audio (file)', 'babyId'],
-      supportedFormats: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/webm', 'audio/ogg']
+      providedFields: {
+        file: req.file ? 'provided' : 'missing',
+        babyId: babyId ? 'provided' : 'missing'
+      }
     });
   }
 
-  // Validate that file has required properties
-  if (!req.file.filename && !req.file.originalname) {
-    console.error('❌ File upload failed: Missing filename and originalname');
-    console.error('req.file content:', JSON.stringify(req.file, null, 2));
-    return sendErrorResponse(res, 400, 'File upload failed: Missing file information', 'INVALID_FILE_UPLOAD');
-  }
-
-  // Validate baby ownership
-  const baby = await Baby.findOne({ _id: babyId, parentId: userId, isActive: true });
-  if (!baby) {
-    // Clean up uploaded file if baby validation fails
-    try {
-      if (req.file.path) {
-        fs.unlinkSync(req.file.path);
-      }
-    } catch (cleanupError) {
-      console.error('Error cleaning up file:', cleanupError);
-    }
-    return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND', {
-      hint: 'Make sure the babyId belongs to your account and the baby is active'
+  if (!req.file) {
+    return sendErrorResponse(res, 400, 'Audio file is required', 'MISSING_AUDIO_FILE', {
+      hint: 'Upload an audio file with field name "audio"',
+      requiredFields: ['audio (file)', 'babyId'],
+      supportedFormats: ['WAV', 'MP3', 'M4A', 'WebM', 'OGG'],
+      maxFileSize: '50MB',
+      maxDuration: '5 minutes'
     });
   }
 
   try {
+    // Verify baby exists and belongs to user
+    const baby = await Baby.findOne({ _id: babyId, userId, isActive: true });
+    if (!baby) {
+      return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND');
+    }
+
+    // 🎵 AUTO-DETECT AUDIO METADATA - This is the key improvement!
+    let audioMetadata = null;
+    let detectedDuration = null;
+    
+    try {
+      console.log('🔍 Auto-detecting audio metadata...');
+      
+      let metadataResult;
+      
+      if (req.file.buffer) {
+        // For multer memory storage (buffer available)
+        metadataResult = await audioMetadataService.extractMetadata(req.file.buffer, req.file.originalname);
+      } else if (req.file.path) {
+        // For multer disk storage (file path available)
+        metadataResult = await audioMetadataService.extractMetadata(req.file.path);
+      } else {
+        console.warn('⚠️ Neither buffer nor path available for metadata extraction');
+      }
+      
+      if (metadataResult?.success && metadataResult.metadata) {
+        audioMetadata = metadataResult.metadata;
+        detectedDuration = audioMetadata.duration;
+        
+        console.log('✅ Audio metadata auto-detected:', {
+          duration: detectedDuration,
+          sampleRate: audioMetadata.sampleRate,
+          channels: audioMetadata.numberOfChannels,
+          bitrate: audioMetadata.bitrate
+        });
+        
+        // Validate auto-detected duration
+        if (detectedDuration && !audioMetadataService.validateDuration(detectedDuration)) {
+          return sendErrorResponse(res, 400, 
+            `Audio duration (${audioMetadataService.formatDuration(detectedDuration)}) exceeds maximum limit of 5 minutes`, 
+            'DURATION_TOO_LONG'
+          );
+        }
+      } else {
+        console.warn('⚠️ Could not auto-detect audio metadata:', metadataResult?.error);
+      }
+    } catch (metadataError) {
+      console.warn('⚠️ Audio metadata detection failed:', metadataError.message);
+      // Continue without metadata - don't fail the upload
+    }
+
     // Handle file path - for cloud storage it might be undefined
     let filePath = '';
     if (req.file.path) {
@@ -121,9 +165,23 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
 
     console.log('📝 Audio data to save:', audioData);
 
-    // Add duration if provided
-    if (duration && !isNaN(parseFloat(duration))) {
+    // Use AUTO-DETECTED duration first, fallback to manual input
+    if (detectedDuration) {
+      audioData.duration = detectedDuration;
+      console.log(`✅ Using auto-detected duration: ${audioMetadataService.formatDuration(detectedDuration)}`);
+    } else if (duration && !isNaN(parseFloat(duration))) {
       audioData.duration = parseFloat(duration);
+      console.log(`📝 Using manually provided duration: ${audioMetadataService.formatDuration(parseFloat(duration))}`);
+    }
+
+    // Add detected audio metadata to the record
+    if (audioMetadata) {
+      audioData.audioMetadata = {
+        sampleRate: audioMetadata.sampleRate,
+        bitRate: audioMetadata.bitrate,
+        channels: audioMetadata.numberOfChannels,
+        encoding: audioMetadata.codec || audioMetadata.container
+      };
     }
 
     // Add recording context if provided
@@ -156,6 +214,22 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       } catch (parseError) {
         console.error('Error parsing recording context:', parseError);
         // Continue without recording context rather than failing
+      }
+    }
+
+    // Handle legacy fields for backward compatibility
+    if (title && typeof title === 'string') {
+      audioData.title = title.substring(0, 100);
+    }
+    if (notes && typeof notes === 'string') {
+      if (!audioData.recordingContext) audioData.recordingContext = {};
+      audioData.recordingContext.notes = notes.substring(0, 500);
+    }
+    if (recordingDate) {
+      try {
+        audioData.recordingDate = new Date(recordingDate);
+      } catch (dateError) {
+        console.warn('Invalid recording date provided:', recordingDate);
       }
     }
 
@@ -194,6 +268,9 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       recordingContext: savedRecording.recordingContext,
       uploadedAt: savedRecording.analysisMetadata.uploadedAt,
       createdAt: savedRecording.createdAt,
+      // Include auto-detected metadata
+      audioMetadata: savedRecording.audioMetadata,
+      metadataAutoDetected: !!detectedDuration,
       // ML analysis info
       analysis: {
         queued: analysisQueued,
@@ -203,32 +280,29 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     };
 
     const message = analysisQueued 
-      ? 'Audio recording uploaded and ML analysis queued successfully'
-      : 'Audio recording uploaded successfully (ML analysis can be triggered manually)';
+      ? 'Audio recording uploaded successfully with auto-detected metadata and ML analysis queued'
+      : 'Audio recording uploaded successfully with auto-detected metadata (ML analysis can be triggered manually)';
 
     return sendSuccessResponse(res, 201, message, {
       recording: responseData
     });
 
-  } catch (dbError) {
-    // Log the full error for debugging
-    console.error('❌ Database error during audio upload:', dbError);
-    console.error('Error details:', {
-      name: dbError.name,
-      message: dbError.message,
-      code: dbError.code,
-      stack: dbError.stack
-    });
-
-    // Clean up uploaded file if database operation fails
-    try {
-      if (req.file && req.file.path) {
+  } catch (error) {
+    console.error('Error uploading audio recording:', error);
+    
+    // Cleanup uploaded file if something went wrong
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      try {
         fs.unlinkSync(req.file.path);
+        console.log('🗑️ Cleaned up failed upload file');
+      } catch (cleanupError) {
+        console.error('Failed to cleanup file after error:', cleanupError);
       }
-    } catch (cleanupError) {
-      console.error('Error cleaning up file:', cleanupError);
     }
-    throw dbError; // Re-throw to be handled by asyncHandler
+    
+    return sendErrorResponse(res, 500, 'Failed to upload audio recording', 'UPLOAD_ERROR', {
+      error: error.message
+    });
   }
 });
 
