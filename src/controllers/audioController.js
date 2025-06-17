@@ -130,22 +130,55 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     
     try {
       console.log('🔍 Extracting audio metadata...');
-      extractedMetadata = await audioMetadataService.extractMetadata(req.file.path, req.file.originalname);
       
-      if (extractedMetadata && extractedMetadata.duration) {
-        autoDuration = extractedMetadata.duration;
-        console.log(`✅ Auto-detected duration: ${autoDuration} seconds`);
-      } else if (extractedMetadata && !extractedMetadata.isValid) {
-        console.warn('⚠️ Metadata extraction failed, using fallback mode');
+      // For cloud storage, req.file.path is undefined, but req.file.location exists
+      // We need to handle this case by downloading the file temporarily or skipping metadata extraction
+      let metadataFilePath = req.file.path;
+      
+      if (!metadataFilePath && req.file.location) {
+        // File is in cloud storage, skip metadata extraction for now
+        console.log('☁️ File stored in cloud storage, skipping metadata extraction');
+        console.log('💡 Consider downloading file temporarily for metadata extraction if needed');
         
-        // Check if it's an FFprobe issue
-        if (extractedMetadata.extractionError === 'FFPROBE_NOT_FOUND') {
-          console.log('💡 FFprobe not found - upload will continue without auto-detected metadata');
-          console.log('   You can still provide duration manually via the "duration" field');
-          console.log('   To enable auto-detection, install FFmpeg: https://ffmpeg.org/download.html');
+        // Create fallback metadata for cloud storage
+        extractedMetadata = {
+          isValid: false,
+          extractionError: 'CLOUD_STORAGE_SKIP',
+          notice: 'Metadata extraction skipped for cloud storage files',
+          extractionMethod: 'cloud-storage-fallback',
+          codec: 'unknown',
+          format: 'unknown'
+        };
+      } else if (metadataFilePath) {
+        // File is local, extract metadata normally
+        extractedMetadata = await audioMetadataService.extractMetadata(metadataFilePath, req.file.originalname);
+        
+        if (extractedMetadata && extractedMetadata.duration) {
+          autoDuration = extractedMetadata.duration;
+          console.log(`✅ Auto-detected duration: ${autoDuration} seconds`);
+        } else if (extractedMetadata && !extractedMetadata.isValid) {
+          console.warn('⚠️ Metadata extraction failed, using fallback mode');
+          
+          // Check if it's an FFprobe issue
+          if (extractedMetadata.extractionError === 'FFPROBE_NOT_FOUND') {
+            console.log('💡 FFprobe not found - upload will continue without auto-detected metadata');
+            console.log('   You can still provide duration manually via the "duration" field');
+            console.log('   To enable auto-detection, install FFmpeg: https://ffmpeg.org/download.html');
+          }
+          
+          // Continue with upload but without duration validation
         }
-        
-        // Continue with upload but without duration validation
+      } else {
+        // Neither path nor location available, create fallback
+        console.warn('⚠️ No file path or location available for metadata extraction');
+        extractedMetadata = {
+          isValid: false,
+          extractionError: 'NO_FILE_PATH',
+          notice: 'No file path available for metadata extraction',
+          extractionMethod: 'no-path-fallback',
+          codec: 'unknown',
+          format: 'unknown'
+        };
       }
     } catch (metadataError) {
       console.warn('⚠️ Metadata extraction error:', {
