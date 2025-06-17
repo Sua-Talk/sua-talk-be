@@ -15,6 +15,37 @@ const audioMetadataService = require('../services/audioMetadataService');
 const uploadAudioRecording = asyncHandler(async (req, res) => {
   const userId = req.user._id;
   
+  // SUPER DETAILED DEBUG LOGGING
+  console.log('🔍 === AUDIO UPLOAD DEBUG START ===');
+  console.log('📋 Request Details:');
+  console.log('   Method:', req.method);
+  console.log('   URL:', req.url);
+  console.log('   Route Path:', req.route?.path);
+  console.log('   Content-Type:', req.headers['content-type']);
+  console.log('   Content-Length:', req.headers['content-length']);
+  console.log('   User-Agent:', req.headers['user-agent']);
+  
+  console.log('📁 File Details:');
+  console.log('   req.file exists:', !!req.file);
+  if (req.file) {
+    console.log('   File fieldname:', req.file.fieldname);
+    console.log('   File originalname:', req.file.originalname);
+    console.log('   File mimetype:', req.file.mimetype);
+    console.log('   File size:', req.file.size);
+    console.log('   File path:', req.file.path);
+  } else {
+    console.log('   ❌ NO FILE FOUND IN REQUEST');
+  }
+  
+  console.log('📝 Body Details:');
+  console.log('   req.body:', JSON.stringify(req.body, null, 2));
+  console.log('   Object.keys(req.body):', Object.keys(req.body));
+  
+  console.log('👤 User Details:');
+  console.log('   User ID:', userId);
+  console.log('   User Active:', req.user.isActive);
+  console.log('🔍 === AUDIO UPLOAD DEBUG END ===');
+  
   // Extract all possible fields from request body - all except babyId are optional
   const { 
     babyId, 

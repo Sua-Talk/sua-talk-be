@@ -23,16 +23,34 @@ const {
  * @desc Upload audio recording for a baby
  * @access Private
  */
-router.post('/upload', 
-  profileUpdateRateLimit, 
-  authenticate, 
+router.post('/upload',
+  authenticate,
+  // Debug middleware to log request details
+  (req, res, next) => {
+    console.log('🚀 === ROUTE MIDDLEWARE DEBUG ===');
+    console.log('📍 Route: POST /audio/upload');
+    console.log('📊 Headers:', req.headers);
+    console.log('📦 Body (before upload):', req.body);
+    console.log('🔒 User authenticated:', !!req.user);
+    console.log('🚀 === PROCEEDING TO UPLOAD MIDDLEWARE ===');
+    next();
+  },
   uploadAudioRecording,
-  handleUploadError,
+  // Debug middleware after upload
+  (req, res, next) => {
+    console.log('✅ === POST-UPLOAD MIDDLEWARE DEBUG ===');
+    console.log('📁 File processed:', !!req.file);
+    console.log('📝 Body (after upload):', req.body);
+    console.log('✅ === PROCEEDING TO CONTROLLER ===');
+    next();
+  },
   validateAudioUpload,
   handleValidationErrors,
-  sanitizeInput, 
-  securityLogger, 
-  audioController.uploadAudioRecording
+  profileRateLimit,
+  sanitizeInput,
+  securityLogger,
+  audioController.uploadAudioRecording,
+  handleUploadError
 );
 
 /**
