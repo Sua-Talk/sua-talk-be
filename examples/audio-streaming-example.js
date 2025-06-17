@@ -325,4 +325,240 @@ if (typeof module !== 'undefined' && module.exports) {
 // Make available in browser
 if (typeof window !== 'undefined') {
   window.SuaTalkAudioPlayer = SuaTalkAudioPlayer;
+}
+
+// Audio Streaming Best Practices Example
+// Handles duration 0 issue with multiple fallback strategies
+
+class AudioPlayer {
+  constructor(audioElement) {
+    this.audio = audioElement;
+    this.expectedDuration = null;
+    this.fallbackStrategies = ['metadata', 'progressive', 'download'];
+    this.currentStrategy = 0;
+  }
+
+  async playAudio(streamUrl, expectedDuration = null) {
+    this.expectedDuration = expectedDuration;
+    
+    // Strategy 1: Use X-Content-Duration header
+    try {
+      await this.loadWithMetadata(streamUrl);
+      if (this.audio.duration > 0) {
+        console.log('✅ Duration loaded from metadata:', this.audio.duration);
+        return;
+      }
+    } catch (error) {
+      console.warn('⚠️ Metadata strategy failed:', error);
+    }
+
+    // Strategy 2: Progressive loading with timeout
+    try {
+      await this.loadWithProgressiveTimeout(streamUrl);
+      if (this.audio.duration > 0) {
+        console.log('✅ Duration loaded progressively:', this.audio.duration);
+        return;
+      }
+    } catch (error) {
+      console.warn('⚠️ Progressive strategy failed:', error);
+    }
+
+    // Strategy 3: Force download then play
+    try {
+      await this.loadWithDownload(streamUrl);
+      console.log('✅ Duration loaded via download:', this.audio.duration);
+    } catch (error) {
+      console.error('❌ All strategies failed:', error);
+      // Use expected duration as fallback
+      if (this.expectedDuration) {
+        this.setFallbackDuration(this.expectedDuration);
+      }
+    }
+  }
+
+  async loadWithMetadata(streamUrl) {
+    return new Promise((resolve, reject) => {
+      this.audio.src = streamUrl;
+      this.audio.preload = 'metadata';
+      
+      const timeout = setTimeout(() => {
+        reject(new Error('Metadata timeout'));
+      }, 3000);
+
+      this.audio.addEventListener('loadedmetadata', () => {
+        clearTimeout(timeout);
+        resolve();
+      }, { once: true });
+
+      this.audio.addEventListener('error', () => {
+        clearTimeout(timeout);
+        reject(new Error('Audio load error'));
+      }, { once: true });
+
+      this.audio.load();
+    });
+  }
+
+  async loadWithProgressiveTimeout(streamUrl) {
+    return new Promise((resolve, reject) => {
+      this.audio.src = streamUrl;
+      this.audio.preload = 'auto';
+      
+      let progressTimeout;
+      let lastProgress = 0;
+      
+      const checkProgress = () => {
+        if (this.audio.buffered.length > 0) {
+          const currentProgress = this.audio.buffered.end(0);
+          if (currentProgress > lastProgress) {
+            lastProgress = currentProgress;
+            
+            // Check if we have enough data and duration
+            if (this.audio.duration > 0) {
+              clearTimeout(progressTimeout);
+              resolve();
+              return;
+            }
+          }
+        }
+        
+        // Continue checking
+        progressTimeout = setTimeout(checkProgress, 500);
+      };
+
+      // Start progress checking
+      checkProgress();
+      
+      // Overall timeout
+      setTimeout(() => {
+        clearTimeout(progressTimeout);
+        reject(new Error('Progressive timeout'));
+      }, 10000);
+
+      this.audio.addEventListener('error', () => {
+        clearTimeout(progressTimeout);
+        reject(new Error('Progressive load error'));
+      }, { once: true });
+
+      this.audio.load();
+    });
+  }
+
+  async loadWithDownload(streamUrl) {
+    return new Promise((resolve, reject) => {
+      // Force full download
+      this.audio.src = streamUrl;
+      this.audio.preload = 'auto';
+      
+      const timeout = setTimeout(() => {
+        reject(new Error('Download timeout'));
+      }, 30000);
+
+      this.audio.addEventListener('canplaythrough', () => {
+        clearTimeout(timeout);
+        resolve();
+      }, { once: true });
+
+      this.audio.addEventListener('error', () => {
+        clearTimeout(timeout);
+        reject(new Error('Download error'));
+      }, { once: true });
+
+      this.audio.load();
+    });
+  }
+
+  setFallbackDuration(duration) {
+    console.log(`🔄 Using fallback duration: ${duration}s`);
+    
+    // Create a visual indicator of duration
+    const durationDisplay = document.querySelector('.audio-duration');
+    if (durationDisplay) {
+      durationDisplay.textContent = this.formatTime(duration);
+    }
+    
+    // Store expected duration for progress calculation
+    this.audio.dataset.expectedDuration = duration;
+  }
+
+  formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
+// Usage Example
+async function initializeAudioPlayer() {
+  const audioElement = document.getElementById('audioPlayer');
+  const player = new AudioPlayer(audioElement);
+  
+  // Get stream URL from API
+  const response = await fetch('/audio/stream-url/RECORDING_ID', {
+    headers: {
+      'Authorization': 'Bearer YOUR_TOKEN'
+    }
+  });
+  
+  const data = await response.json();
+  
+  if (data.success) {
+    // Use proxy URL for better compatibility
+    const proxyUrl = `/audio/proxy/${data.data.recordingId}`;
+    
+    // Play with expected duration fallback
+    await player.playAudio(proxyUrl, data.data.duration);
+  }
+}
+
+// Alternative: Simple duration fix with retry
+function simpleAudioFix(audioElement, streamUrl, expectedDuration) {
+  audioElement.src = streamUrl;
+  
+  // Add X-Content-Duration header check
+  fetch(streamUrl, { method: 'HEAD' })
+    .then(response => {
+      const serverDuration = response.headers.get('X-Content-Duration');
+      if (serverDuration && serverDuration !== '0') {
+        console.log('✅ Server provided duration:', serverDuration);
+      }
+    });
+  
+  // Retry mechanism for duration
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  const checkDuration = () => {
+    if (audioElement.duration && audioElement.duration > 0) {
+      console.log('✅ Duration loaded:', audioElement.duration);
+      return;
+    }
+    
+    retryCount++;
+    if (retryCount < maxRetries) {
+      console.log(`🔄 Retrying duration check (${retryCount}/${maxRetries})`);
+      setTimeout(checkDuration, 1000);
+    } else {
+      console.log(`🔄 Using fallback duration: ${expectedDuration}s`);
+      // Show expected duration in UI
+      updateDurationDisplay(expectedDuration);
+    }
+  };
+  
+  audioElement.addEventListener('loadedmetadata', checkDuration);
+  audioElement.load();
+}
+
+function updateDurationDisplay(duration) {
+  const display = document.querySelector('.duration-display');
+  if (display) {
+    const mins = Math.floor(duration / 60);
+    const secs = Math.floor(duration % 60);
+    display.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
+// Export for use
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AudioPlayer, simpleAudioFix };
 } 

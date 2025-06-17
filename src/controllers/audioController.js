@@ -6,6 +6,7 @@ const { sendSuccessResponse, sendErrorResponse, asyncHandler } = require('../mid
 const { audioRecordingsDir } = require('../middleware/upload');
 const jobManager = require('../jobs/jobManager');
 const audioMetadataService = require('../services/audioMetadataService');
+const audioProcessingService = require('../services/audioProcessingService');
 
 /**
  * Upload and process audio recording with auto-metadata detection
@@ -1001,6 +1002,7 @@ const streamAudio = asyncHandler(async (req, res) => {
       'Content-Type': recording.mimeType || 'audio/mpeg',
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'private, max-age=3600',
+      'X-Content-Duration': recording.duration || '0',
       'X-Content-Type-Options': 'nosniff'
     });
 
