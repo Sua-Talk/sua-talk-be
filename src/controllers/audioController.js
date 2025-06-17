@@ -69,49 +69,44 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       return sendErrorResponse(res, 404, 'Baby not found or access denied', 'BABY_NOT_FOUND');
     }
 
-    // 🎵 AUTO-DETECT AUDIO METADATA - This is the key improvement!
-    let audioMetadata = null;
-    let detectedDuration = null;
+    // Auto-extract metadata from uploaded file
+    let extractedMetadata = null;
+    let autoDuration = null;
     
     try {
-      console.log('🔍 Auto-detecting audio metadata...');
+      console.log('🔍 Extracting audio metadata...');
+      extractedMetadata = await audioMetadataService.extractMetadata(req.file.path, req.file.originalname);
       
-      let metadataResult;
-      
-      if (req.file.buffer) {
-        // For multer memory storage (buffer available)
-        metadataResult = await audioMetadataService.extractMetadata(req.file.buffer, req.file.originalname);
-      } else if (req.file.path) {
-        // For multer disk storage (file path available)
-        metadataResult = await audioMetadataService.extractMetadata(req.file.path);
-      } else {
-        console.warn('⚠️ Neither buffer nor path available for metadata extraction');
-      }
-      
-      if (metadataResult?.success && metadataResult.metadata) {
-        audioMetadata = metadataResult.metadata;
-        detectedDuration = audioMetadata.duration;
-        
-        console.log('✅ Audio metadata auto-detected:', {
-          duration: detectedDuration,
-          sampleRate: audioMetadata.sampleRate,
-          channels: audioMetadata.numberOfChannels,
-          bitrate: audioMetadata.bitrate
-        });
-        
-        // Validate auto-detected duration
-        if (detectedDuration && !audioMetadataService.validateDuration(detectedDuration)) {
-          return sendErrorResponse(res, 400, 
-            `Audio duration (${audioMetadataService.formatDuration(detectedDuration)}) exceeds maximum limit of 5 minutes`, 
-            'DURATION_TOO_LONG'
-          );
-        }
-      } else {
-        console.warn('⚠️ Could not auto-detect audio metadata:', metadataResult?.error);
+      if (extractedMetadata && extractedMetadata.duration) {
+        autoDuration = extractedMetadata.duration;
+        console.log(`✅ Auto-detected duration: ${autoDuration} seconds`);
+      } else if (extractedMetadata && !extractedMetadata.isValid) {
+        console.warn('⚠️ Metadata extraction failed, using fallback mode');
+        // Continue with upload but without duration validation
       }
     } catch (metadataError) {
-      console.warn('⚠️ Audio metadata detection failed:', metadataError.message);
-      // Continue without metadata - don't fail the upload
+      console.warn('⚠️ Metadata extraction error:', metadataError.message);
+      // Continue with upload - metadata extraction is not critical for basic functionality
+    }
+
+    // Use auto-detected duration or manual input (prefer auto-detected)
+    const finalDuration = autoDuration || (duration ? parseFloat(duration) : null);
+    
+    // Validate duration if available
+    if (finalDuration) {
+      if (finalDuration > 300) { // 5 minutes max
+        return sendErrorResponse(res, 400, 
+          `Audio duration (${finalDuration.toFixed(1)}s) exceeds maximum allowed duration of 5 minutes (300s)`,
+          'DURATION_TOO_LONG'
+        );
+      }
+      
+      if (finalDuration < 0.1) {
+        return sendErrorResponse(res, 400, 
+          'Audio duration is too short (minimum 0.1 seconds)',
+          'DURATION_TOO_SHORT'
+        );
+      }
     }
 
     // Handle file path - for cloud storage it might be undefined
@@ -166,21 +161,34 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
     console.log('📝 Audio data to save:', audioData);
 
     // Use AUTO-DETECTED duration first, fallback to manual input
-    if (detectedDuration) {
-      audioData.duration = detectedDuration;
-      console.log(`✅ Using auto-detected duration: ${audioMetadataService.formatDuration(detectedDuration)}`);
-    } else if (duration && !isNaN(parseFloat(duration))) {
-      audioData.duration = parseFloat(duration);
-      console.log(`📝 Using manually provided duration: ${audioMetadataService.formatDuration(parseFloat(duration))}`);
+    if (extractedMetadata && extractedMetadata.duration) {
+      audioData.duration = extractedMetadata.duration;
+      console.log(`✅ Using auto-detected duration: ${extractedMetadata.duration} seconds`);
+    } else if (finalDuration) {
+      audioData.duration = finalDuration;
+      console.log(`📝 Using manually provided duration: ${finalDuration.toFixed(1)} seconds`);
     }
 
     // Add detected audio metadata to the record
-    if (audioMetadata) {
+    if (extractedMetadata && extractedMetadata.isValid) {
       audioData.audioMetadata = {
-        sampleRate: audioMetadata.sampleRate,
-        bitRate: audioMetadata.bitrate,
-        channels: audioMetadata.numberOfChannels,
-        encoding: audioMetadata.codec || audioMetadata.container
+        sampleRate: extractedMetadata.sampleRate,
+        bitRate: extractedMetadata.bitRate,
+        channels: extractedMetadata.channels,
+        codec: extractedMetadata.codec,
+        format: extractedMetadata.format,
+        extractionMethod: extractedMetadata.extractionMethod
+      };
+    } else if (extractedMetadata && !extractedMetadata.isValid) {
+      // Store fallback metadata with warning
+      audioData.audioMetadata = {
+        sampleRate: null,
+        bitRate: null,
+        channels: null,
+        codec: extractedMetadata.codec,
+        format: extractedMetadata.format,
+        extractionMethod: extractedMetadata.extractionMethod,
+        warning: extractedMetadata.notice
       };
     }
 
@@ -270,7 +278,7 @@ const uploadAudioRecording = asyncHandler(async (req, res) => {
       createdAt: savedRecording.createdAt,
       // Include auto-detected metadata
       audioMetadata: savedRecording.audioMetadata,
-      metadataAutoDetected: !!detectedDuration,
+      metadataAutoDetected: !!extractedMetadata,
       // ML analysis info
       analysis: {
         queued: analysisQueued,
