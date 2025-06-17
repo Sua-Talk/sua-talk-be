@@ -181,14 +181,32 @@ const imageFileFilter = (req, file, cb) => {
  */
 const audioFileFilter = (req, file, cb) => {
   const allowedTypes = [
-    'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 
-    'audio/wave', 'audio/x-wave', 'audio/webm', 'audio/ogg'
+    // MP3 formats
+    'audio/mpeg', 'audio/mp3',
+    // WAV formats
+    'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/x-wave',
+    // M4A formats
+    'audio/mp4', 'audio/m4a', 'audio/aac',
+    // WebM and OGG
+    'audio/webm', 'audio/ogg',
+    // FLAC
+    'audio/flac', 'audio/x-flac'
   ];
+  
+  console.log(`🔍 Cloud storage audio file filter check:`, {
+    filename: file.originalname,
+    mimetype: file.mimetype,
+    fieldname: file.fieldname,
+    allowedTypes: allowedTypes,
+    isAllowed: allowedTypes.includes(file.mimetype)
+  });
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only MP3, WAV, WebM, and OGG audio files are allowed.'), false);
+    const error = new Error(`Invalid file type. Only MP3, WAV, M4A, AAC, WebM, OGG, and FLAC audio files are allowed. Received: ${file.mimetype}`);
+    error.code = 'INVALID_FILE_TYPE';
+    cb(error, false);
   }
 };
 

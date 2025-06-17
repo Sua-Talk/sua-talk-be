@@ -206,52 +206,87 @@ const createUploadMiddleware = (cloudUploadFn, localUploadFn, type) => {
     const clearTimeoutAndNext = (error) => {
       clearTimeout(timeout);
       if (error) {
-        // Handle specific busboy errors
-        if (error.message && error.message.includes('Unexpected end of form')) {
-          console.error(`❌ Form incomplete error for ${type}:`, {
-            error: error.message,
-            headers: req.headers,
-            contentLength: req.headers['content-length'],
-            contentType: req.headers['content-type']
-          });
-          return res.status(400).json({
-            success: false,
-            message: 'Upload was interrupted or form data is incomplete. Please check your request format and try again.',
-            error: 'FORM_INCOMPLETE',
-            details: {
-              hint: 'Make sure you are sending multipart/form-data with the correct field names',
-              requiredFields: type === 'audio recording' ? ['audio (file)', 'babyId'] : ['photo (file)']
-            }
-          });
-        }
-        
-        // Log other errors for debugging
+        // Enhanced logging for debugging
         console.error(`❌ Upload error for ${type}:`, {
           error: error.message,
           code: error.code,
-          stack: error.stack,
-          headers: req.headers
+          name: error.name,
+          stack: error.stack?.split('\n').slice(0, 3), // First 3 lines of stack
+          headers: req.headers,
+          contentLength: req.headers['content-length'],
+          contentType: req.headers['content-type'],
+          hasBody: !!req.body,
+          bodyKeys: Object.keys(req.body || {}),
+          hasFile: !!req.file
         });
+
+        // Handle specific busboy errors
+        if (error.message && error.message.includes('Unexpected end of form')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Upload was interrupted or form data is incomplete. This may be caused by file type not supported by cloud storage. Please check your file format and try again.',
+            error: 'FORM_INCOMPLETE',
+            details: {
+              hint: 'Make sure you are sending multipart/form-data with the correct field names and supported file formats',
+              requiredFields: type === 'audio recording' ? ['audio (file)', 'babyId'] : ['photo (file)'],
+              supportedFormats: type === 'audio recording' ? 
+                ['MP3 (.mp3)', 'WAV (.wav)', 'M4A (.m4a)', 'AAC (.aac)', 'WebM (.webm)', 'OGG (.ogg)', 'FLAC (.flac)'] : 
+                ['JPEG (.jpg, .jpeg)', 'PNG (.png)', 'WebP (.webp)'],
+              troubleshooting: [
+                'Check that your file format is supported',
+                'Ensure stable internet connection',
+                'Try uploading a smaller file first',
+                'Verify the file is not corrupted'
+              ]
+            }
+          });
+        }
+
+        // Handle file type errors specifically
+        if (error.message && error.message.includes('Invalid file type') || error.code === 'INVALID_FILE_TYPE') {
+          return res.status(400).json({
+            success: false,
+            message: error.message || 'Invalid file type uploaded.',
+            error: 'INVALID_FILE_TYPE',
+            details: {
+              supportedFormats: type === 'audio recording' ? 
+                ['MP3 (.mp3)', 'WAV (.wav)', 'M4A (.m4a)', 'AAC (.aac)', 'WebM (.webm)', 'OGG (.ogg)', 'FLAC (.flac)'] : 
+                ['JPEG (.jpg, .jpeg)', 'PNG (.png)', 'WebP (.webp)'],
+              hint: 'Please convert your file to one of the supported formats'
+            }
+          });
+        }
         
         return next(error);
       }
       next();
     };
 
-    // Log upload attempt
-    console.log(`📤 Attempting ${type} upload - Content-Type: ${req.headers['content-type']}, Content-Length: ${req.headers['content-length']}`);
+    // Enhanced logging for upload attempt
+    console.log(`📤 Attempting ${type} upload:`, {
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      userAgent: req.headers['user-agent']?.substring(0, 100),
+      hasAuth: !!req.headers.authorization,
+      method: req.method,
+      url: req.url
+    });
 
     // Try cloud storage first, fall back to local on error
     if (!useLocalStorage && storageConfig) {
       try {
         return cloudUploadFn(req, res, (error) => {
           if (error) {
-            console.error(`❌ Cloud storage error for ${type}:`, error.message);
-            console.warn(`🔄 Falling back to local storage for ${type}`);
+            console.warn(`🔄 Cloud storage failed for ${type}, falling back to local storage:`, {
+              error: error.message,
+              code: error.code,
+              willFallback: true
+            });
             
             // Fallback to local storage
             return localUploadFn(req, res, clearTimeoutAndNext);
           }
+          console.log(`✅ Cloud storage success for ${type}`);
           clearTimeoutAndNext();
         });
       } catch (error) {
@@ -261,6 +296,7 @@ const createUploadMiddleware = (cloudUploadFn, localUploadFn, type) => {
       }
     } else {
       // Use local storage
+      console.log(`📁 Using local storage for ${type}`);
       return localUploadFn(req, res, clearTimeoutAndNext);
     }
   };

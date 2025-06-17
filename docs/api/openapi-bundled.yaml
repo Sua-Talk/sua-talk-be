@@ -124,7 +124,7 @@ paths:
                   description: '**DEPRECATED** - Duration will be auto-detected from audio file. Manual input ignored.'
             encoding:
               audio:
-                contentType: audio/wav, audio/mpeg, audio/mp4, audio/webm, audio/ogg, audio/flac
+                contentType: audio/wav, audio/mpeg, audio/mp3, audio/mp4, audio/m4a, audio/aac, audio/webm, audio/ogg, audio/flac, audio/x-wav, audio/wave, audio/x-wave, audio/x-flac
       responses:
         '201':
           description: Audio recording uploaded successfully with auto-detected metadata
